@@ -1,4 +1,4 @@
-//===- COFFImportFile.h - COFF short import file implementation -*- C++ -*-===//
+//===- COFFImportFile.h - VPE short import file implementation -*- C++ -*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// COFF short import file is a special kind of file which contains
+// VPE short import file is a special kind of file which contains
 // only symbol names for DLL-exported symbols. This class implements
 // exporting of Symbols to create libraries and a SymbolicFile
 // interface for the file type.
@@ -17,7 +17,7 @@
 #define LLVM_OBJECT_VPE_IMPORT_FILE_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Object/COFF.h"
+#include "llvm/Object/VPE.h"
 #include "llvm/Object/IRObjectFile.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Object/SymbolicFile.h"
@@ -37,7 +37,7 @@ public:
   void moveSymbolNext(DataRefImpl &Symb) const override { ++Symb.p; }
 
   Error printSymbolName(raw_ostream &OS, DataRefImpl Symb) const override {
-    OS << StringRef(Data.getBufferStart() + sizeof(coff_import_header));
+    OS << StringRef(Data.getBufferStart() + sizeof(vpe_import_header));
     return Error::success();
   }
 
@@ -55,14 +55,14 @@ public:
     return BasicSymbolRef(Symb, this);
   }
 
-  const coff_import_header *getVPEImportHeader() const {
-    return reinterpret_cast<const object::coff_import_header *>(
+  const vpe_import_header *getVPEImportHeader() const {
+    return reinterpret_cast<const object::vpe_import_header *>(
         Data.getBufferStart());
   }
 
 private:
   bool isData() const {
-    return getVPEImportHeader()->getType() == COFF::IMPORT_DATA;
+    return getVPEImportHeader()->getType() == VPE::IMPORT_DATA;
   }
 };
 
@@ -103,7 +103,7 @@ struct VPEShortExport {
 
 Error writeImportLibrary(StringRef ImportName, StringRef Path,
                          ArrayRef<VPEShortExport> Exports,
-                         COFF::MachineTypes Machine, bool MinGW);
+                         VPE::MachineTypes Machine);
 
 } // namespace object
 } // namespace llvm

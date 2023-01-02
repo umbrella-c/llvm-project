@@ -91,9 +91,19 @@ thread::hardware_concurrency() noexcept
     GetSystemInfo(&info);
     return info.dwNumberOfProcessors;
 #elif defined(__MOLLENOS__)
-    SystemDescriptor_t Info;
-    SystemQuery(&Info);
-    return Info.NumberOfActiveCores;
+    OSSystemCPUInfo_t cpuInfo;
+    oserr_t           oserr;
+    size_t            bytesQueried;
+    oserr = OSSystemQuery(
+            OSSYSTEMQUERY_CPUINFO,
+            &cpuInfo,
+            sizeof(OSSystemCPUInfo_t),
+            &bytesQueried
+    );
+    if (oserr != OS_EOK) {
+        return 0;
+    }
+    return cpuInfo.NumberOfActiveCores;
 #else  // defined(CTL_HW) && defined(HW_NCPU)
     // TODO: grovel through /proc or check cpuid on x86 and similar
     // instructions on other architectures.

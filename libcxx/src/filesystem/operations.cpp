@@ -354,17 +354,6 @@ private:
     return P;
   }
 
-  PosPtr consumeDriveIdentifier(PosPtr P, PosPtr End) const noexcept {
-    if (P == End)
-      return nullptr;
-    while (P < End) {
-      if (P + 1 < End && P[0] == ':' && (P[1] == '/' || P[1] == '\\')) {
-        return P + 2;
-      }
-    }
-    return nullptr;
-  }
-
   PosPtr consumeDriveLetter(PosPtr P, PosPtr End) const noexcept {
     if (P == End)
       return nullptr;
@@ -393,9 +382,6 @@ private:
     if (PosPtr Ret = consumeDriveLetter(P, End))
       return Ret;
     if (PosPtr Ret = consumeNetworkRoot(P, End))
-      return Ret;
-#elif defined(__MOLLENOS__)
-    if (PosPtr Ret = consumeDriveIdentifier(P, End))
       return Ret;
 #endif
     return nullptr;
@@ -1379,7 +1365,7 @@ bool __remove(const path& p, error_code* ec) {
 //
 // The second implementation is used on platforms where `openat()` & friends are available,
 // and it threads file descriptors through recursive calls to avoid such race conditions.
-#if defined(_LIBCPP_WIN32API) || defined (__MVS__)
+#if defined(_LIBCPP_WIN32API) || defined (__MVS__) || defined(__MOLLENOS__)
 # define REMOVE_ALL_USE_DIRECTORY_ITERATOR
 #endif
 
@@ -1576,7 +1562,7 @@ path __temp_directory_path(error_code* ec) {
   path p(buf);
 #elif defined(__MOLLENOS__)
   char buf[_MAXPATH] = { 0 };
-  GetApplicationTemporaryDirectory(&buf[0], _MAXPATH);
+  OSGetApplicationTemporaryDirectory(&buf[0], _MAXPATH);
   path p(&buf[0]);
 #else
   const char* env_paths[] = {"TMPDIR", "TMP", "TEMP", "TEMPDIR"};

@@ -2011,7 +2011,7 @@ inline int Stat(const char* path, StatStruct* buf) { return GetFileInformationFr
 inline int StrCaseCmp(const char* s1, const char* s2) { return strcasecmp(s1, s2); }
 inline char* StrDup(const char* src) { return strdup(src); }
 
-inline int ChDir(const char* dir) { return SetWorkingDirectory(dir) == OsSuccess ? 0 : -1; }
+inline int ChDir(const char* dir) { return SetWorkingDirectory(dir) == OS_EOK ? 0 : -1; }
 inline int RmDir(const char* dir) { return remove(dir); }
 inline bool IsDir(const StatStruct& st) { return (st.Flags & FILE_FLAG_DIRECTORY) != 0; }
 

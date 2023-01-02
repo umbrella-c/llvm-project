@@ -48,6 +48,10 @@ namespace XCOFFYAML {
 struct Object;
 }
 
+namespace VPEYAML {
+struct Object;
+}
+
 namespace ArchYAML {
 struct Archive;
 }
@@ -72,6 +76,7 @@ bool yaml2minidump(MinidumpYAML::Object &Doc, raw_ostream &Out,
 bool yaml2offload(OffloadYAML::Binary &Doc, raw_ostream &Out, ErrorHandler EH);
 bool yaml2wasm(WasmYAML::Object &Doc, raw_ostream &Out, ErrorHandler EH);
 bool yaml2xcoff(XCOFFYAML::Object &Doc, raw_ostream &Out, ErrorHandler EH);
+bool yaml2vpe(VPEYAML::Object &Doc, raw_ostream &Out, ErrorHandler EH);
 bool yaml2dxcontainer(DXContainerYAML::Object &Doc, raw_ostream &Out,
                       ErrorHandler EH);
 

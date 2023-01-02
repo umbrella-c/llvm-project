@@ -177,6 +177,7 @@ void MCContext::reset() {
   COFFUniquingMap.clear();
   WasmUniquingMap.clear();
   XCOFFUniquingMap.clear();
+  VPEUniquingMap.clear();
   DXCUniquingMap.clear();
 
   ELFEntrySizeMap.clear();
@@ -763,14 +764,6 @@ MCSectionVPE *MCContext::getVPESection(StringRef Section,
                                        const char *BeginSymName) {
   return getVPESection(Section, Characteristics, Kind, "", 0, GenericSectionID,
                         BeginSymName);
-}
-
-MCSectionVPE *MCContext::getVPESection(StringRef Section) {
-  VPESectionKey T{Section, "", 0, GenericSectionID};
-  auto Iter = VPEUniquingMap.find(T);
-  if (Iter == VPEUniquingMap.end())
-    return nullptr;
-  return Iter->second;
 }
 
 MCSectionVPE *MCContext::getAssociativeVPESection(MCSectionVPE *Sec,

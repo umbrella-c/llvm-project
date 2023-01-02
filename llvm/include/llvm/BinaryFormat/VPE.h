@@ -93,6 +93,7 @@ enum MachineTypes : unsigned {
   IMAGE_FILE_MACHINE_ARM = 0x1C0,
   IMAGE_FILE_MACHINE_ARMNT = 0x1C4,
   IMAGE_FILE_MACHINE_ARM64 = 0xAA64,
+  IMAGE_FILE_MACHINE_ARM64EC = 0xA641,
   IMAGE_FILE_MACHINE_EBC = 0xEBC,
   IMAGE_FILE_MACHINE_I386 = 0x14C,
   IMAGE_FILE_MACHINE_IA64 = 0x200,
@@ -659,6 +660,11 @@ struct ImportHeader {
   ImportNameType getNameType() const {
     return static_cast<ImportNameType>((TypeInfo & 0x1C) >> 2);
   }
+};
+
+enum CodeViewIdentifiers {
+  DEBUG_SECTION_MAGIC = 0x4,
+  DEBUG_HASHES_SECTION_MAGIC = 0x133C9C5
 };
 
 inline bool isReservedSectionNumber(int32_t SectionNumber) {

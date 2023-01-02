@@ -549,7 +549,7 @@ public:
 #elif defined(__MOLLENOS__)
     typedef char mask;
     static const mask space  = _CTYPE_S;
-    static const mask print  = _CTYPE_P | _CTYPE_U | _CTYPE_L | _CTYPE_N | _CTYPE_B;
+    static const mask print  = (char)(_CTYPE_P | _CTYPE_U | _CTYPE_L | _CTYPE_N | _CTYPE_B);
     static const mask cntrl  = _CTYPE_C;
     static const mask upper  = _CTYPE_U;
     static const mask lower  = _CTYPE_L;
@@ -558,7 +558,8 @@ public:
     static const mask punct  = _CTYPE_P;
     static const mask xdigit = _CTYPE_X | _CTYPE_N;
     static const mask blank  = _CTYPE_B;
-    static const mask __regex_word = 0x80;
+    // mask is already fully saturated, use a different type in regex_type_traits.
+    static const unsigned short __regex_word = 0x100;
 # define _LIBCPP_CTYPE_MASK_IS_COMPOSITE_PRINT
 # define _LIBCPP_CTYPE_MASK_IS_COMPOSITE_ALPHA
 # define _LIBCPP_CTYPE_MASK_IS_COMPOSITE_XDIGIT

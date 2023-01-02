@@ -1,4 +1,4 @@
-//===- VPEAsmParser.cpp - VPE COFF Assembly Parser ------------------------===//
+//===- VPEAsmParser.cpp - VPE Assembly Parser -----------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -11,7 +11,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/BinaryFormat/COFF.h"
+#include "llvm/BinaryFormat/VPE.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCDirectives.h"
 #include "llvm/MC/MCObjectFileInfo.h"
@@ -46,7 +46,7 @@ class VPEAsmParser : public MCAsmParserExtension {
 
   bool ParseSectionSwitch(StringRef Section, unsigned Characteristics,
                           SectionKind Kind, StringRef COMDATSymName,
-                          COFF::COMDATType Type);
+                          VPE::COMDATType Type);
 
   bool ParseSectionName(StringRef &SectionName);
   bool ParseSectionFlags(StringRef SectionName, StringRef FlagsString,
@@ -77,31 +77,31 @@ class VPEAsmParser : public MCAsmParserExtension {
 
   bool ParseSectionDirectiveText(StringRef, SMLoc) {
     return ParseSectionSwitch(".text",
-                              COFF::IMAGE_SCN_CNT_CODE
-                            | COFF::IMAGE_SCN_MEM_EXECUTE
-                            | COFF::IMAGE_SCN_MEM_READ,
+                              VPE::IMAGE_SCN_CNT_CODE
+                            | VPE::IMAGE_SCN_MEM_EXECUTE
+                            | VPE::IMAGE_SCN_MEM_READ,
                               SectionKind::getText());
   }
 
   bool ParseSectionDirectiveData(StringRef, SMLoc) {
-    return ParseSectionSwitch(".data", COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
-                                           COFF::IMAGE_SCN_MEM_READ |
-                                           COFF::IMAGE_SCN_MEM_WRITE,
+    return ParseSectionSwitch(".data", VPE::IMAGE_SCN_CNT_INITIALIZED_DATA |
+                                           VPE::IMAGE_SCN_MEM_READ |
+                                           VPE::IMAGE_SCN_MEM_WRITE,
                               SectionKind::getData());
   }
 
   bool ParseSectionDirectiveBSS(StringRef, SMLoc) {
     return ParseSectionSwitch(".bss",
-                              COFF::IMAGE_SCN_CNT_UNINITIALIZED_DATA
-                            | COFF::IMAGE_SCN_MEM_READ
-                            | COFF::IMAGE_SCN_MEM_WRITE,
+                              VPE::IMAGE_SCN_CNT_UNINITIALIZED_DATA
+                            | VPE::IMAGE_SCN_MEM_READ
+                            | VPE::IMAGE_SCN_MEM_WRITE,
                               SectionKind::getBSS());
   }
   bool ParseSectionDirectiveEhFrame(StringRef, SMLoc) {
     return ParseSectionSwitch(".eh_frame",
-                              COFF::IMAGE_SCN_CNT_INITIALIZED_DATA
-                            | COFF::IMAGE_SCN_MEM_READ
-                            | COFF::IMAGE_SCN_MEM_WRITE,
+                              VPE::IMAGE_SCN_CNT_INITIALIZED_DATA
+                            | VPE::IMAGE_SCN_MEM_READ
+                            | VPE::IMAGE_SCN_MEM_WRITE,
                               SectionKind::getData());
   }
   bool ParseDirectiveSection(StringRef, SMLoc);
@@ -112,7 +112,7 @@ class VPEAsmParser : public MCAsmParserExtension {
   bool ParseDirectiveSecRel32(StringRef, SMLoc);
   bool ParseDirectiveSecIdx(StringRef, SMLoc);
   bool ParseDirectiveSymIdx(StringRef, SMLoc);
-  bool parseCOMDATType(COFF::COMDATType &Type);
+  bool parseCOMDATType(VPE::COMDATType &Type);
   bool ParseDirectiveLinkOnce(StringRef, SMLoc);
   bool ParseDirectiveSymbolAttribute(StringRef Directive, SMLoc);
   bool ParseDirectiveRVA(StringRef, SMLoc);
@@ -125,10 +125,10 @@ public:
 } // end annonomous namespace.
 
 static SectionKind computeSectionKind(unsigned Flags) {
-  if (Flags & COFF::IMAGE_SCN_MEM_EXECUTE)
+  if (Flags & VPE::IMAGE_SCN_MEM_EXECUTE)
     return SectionKind::getText();
-  if (Flags & COFF::IMAGE_SCN_MEM_READ &&
-      (Flags & COFF::IMAGE_SCN_MEM_WRITE) == 0)
+  if (Flags & VPE::IMAGE_SCN_MEM_READ &&
+      (Flags & VPE::IMAGE_SCN_MEM_WRITE) == 0)
     return SectionKind::getReadOnly();
   return SectionKind::getData();
 }
@@ -226,22 +226,22 @@ bool VPEAsmParser::ParseSectionFlags(StringRef SectionName,
     SecFlags = InitData;
 
   if (SecFlags & Code)
-    *Flags |= COFF::IMAGE_SCN_CNT_CODE | COFF::IMAGE_SCN_MEM_EXECUTE;
+    *Flags |= VPE::IMAGE_SCN_CNT_CODE | VPE::IMAGE_SCN_MEM_EXECUTE;
   if (SecFlags & InitData)
-    *Flags |= COFF::IMAGE_SCN_CNT_INITIALIZED_DATA;
+    *Flags |= VPE::IMAGE_SCN_CNT_INITIALIZED_DATA;
   if ((SecFlags & Alloc) && (SecFlags & Load) == 0)
-    *Flags |= COFF::IMAGE_SCN_CNT_UNINITIALIZED_DATA;
+    *Flags |= VPE::IMAGE_SCN_CNT_UNINITIALIZED_DATA;
   if (SecFlags & NoLoad)
-    *Flags |= COFF::IMAGE_SCN_LNK_REMOVE;
+    *Flags |= VPE::IMAGE_SCN_LNK_REMOVE;
   if ((SecFlags & Discardable) ||
       MCSectionVPE::isImplicitlyDiscardable(SectionName))
-    *Flags |= COFF::IMAGE_SCN_MEM_DISCARDABLE;
+    *Flags |= VPE::IMAGE_SCN_MEM_DISCARDABLE;
   if ((SecFlags & NoRead) == 0)
-    *Flags |= COFF::IMAGE_SCN_MEM_READ;
+    *Flags |= VPE::IMAGE_SCN_MEM_READ;
   if ((SecFlags & NoWrite) == 0)
-    *Flags |= COFF::IMAGE_SCN_MEM_WRITE;
+    *Flags |= VPE::IMAGE_SCN_MEM_WRITE;
   if (SecFlags & Shared)
-    *Flags |= COFF::IMAGE_SCN_MEM_SHARED;
+    *Flags |= VPE::IMAGE_SCN_MEM_SHARED;
 
   return false;
 }
@@ -284,19 +284,19 @@ bool VPEAsmParser::ParseDirectiveCGProfile(StringRef S, SMLoc Loc) {
 bool VPEAsmParser::ParseSectionSwitch(StringRef Section,
                                        unsigned Characteristics,
                                        SectionKind Kind) {
-  return ParseSectionSwitch(Section, Characteristics, Kind, "", (COFF::COMDATType)0);
+  return ParseSectionSwitch(Section, Characteristics, Kind, "", (VPE::COMDATType)0);
 }
 
 bool VPEAsmParser::ParseSectionSwitch(StringRef Section,
                                        unsigned Characteristics,
                                        SectionKind Kind,
                                        StringRef COMDATSymName,
-                                       COFF::COMDATType Type) {
+                                       VPE::COMDATType Type) {
   if (getLexer().isNot(AsmToken::EndOfStatement))
     return TokError("unexpected token in section switching directive");
   Lex();
 
-  getStreamer().SwitchSection(getContext().getVPESection(
+  getStreamer().switchSection(getContext().getVPESection(
       Section, Characteristics, Kind, COMDATSymName, Type));
 
   return false;
@@ -332,9 +332,9 @@ bool VPEAsmParser::ParseDirectiveSection(StringRef, SMLoc) {
   if (ParseSectionName(SectionName))
     return TokError("expected identifier in directive");
 
-  unsigned Flags = COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
-                   COFF::IMAGE_SCN_MEM_READ |
-                   COFF::IMAGE_SCN_MEM_WRITE;
+  unsigned Flags = VPE::IMAGE_SCN_CNT_INITIALIZED_DATA |
+                   VPE::IMAGE_SCN_MEM_READ |
+                   VPE::IMAGE_SCN_MEM_WRITE;
 
   if (getLexer().is(AsmToken::Comma)) {
     Lex();
@@ -349,13 +349,13 @@ bool VPEAsmParser::ParseDirectiveSection(StringRef, SMLoc) {
       return true;
   }
 
-  COFF::COMDATType Type = (COFF::COMDATType)0;
+  VPE::COMDATType Type = (VPE::COMDATType)0;
   StringRef COMDATSymName;
   if (getLexer().is(AsmToken::Comma)) {
-    Type = COFF::IMAGE_COMDAT_SELECT_ANY;
+    Type = VPE::IMAGE_COMDAT_SELECT_ANY;
     Lex();
 
-    Flags |= COFF::IMAGE_SCN_LNK_COMDAT;
+    Flags |= VPE::IMAGE_SCN_LNK_COMDAT;
 
     if (!getLexer().is(AsmToken::Identifier))
       return TokError("expected comdat type such as 'discard' or 'largest' "
@@ -379,7 +379,7 @@ bool VPEAsmParser::ParseDirectiveSection(StringRef, SMLoc) {
   if (Kind.isText()) {
     const Triple &T = getContext().getTargetTriple();
     if (T.getArch() == Triple::arm || T.getArch() == Triple::thumb)
-      Flags |= COFF::IMAGE_SCN_MEM_16BIT;
+      Flags |= VPE::IMAGE_SCN_MEM_16BIT;
   }
   ParseSectionSwitch(SectionName, Flags, Kind, COMDATSymName, Type);
   return false;
@@ -393,7 +393,7 @@ bool VPEAsmParser::ParseDirectiveDef(StringRef, SMLoc) {
 
   MCSymbol *Sym = getContext().getOrCreateSymbol(SymbolName);
 
-  getStreamer().BeginCOFFSymbolDef(Sym);
+  getStreamer().beginCOFFSymbolDef(Sym);
 
   Lex();
   return false;
@@ -408,7 +408,7 @@ bool VPEAsmParser::ParseDirectiveScl(StringRef, SMLoc) {
     return TokError("unexpected token in directive");
 
   Lex();
-  getStreamer().EmitCOFFSymbolStorageClass(SymbolStorageClass);
+  getStreamer().emitCOFFSymbolStorageClass(SymbolStorageClass);
   return false;
 }
 
@@ -421,13 +421,13 @@ bool VPEAsmParser::ParseDirectiveType(StringRef, SMLoc) {
     return TokError("unexpected token in directive");
 
   Lex();
-  getStreamer().EmitCOFFSymbolType(Type);
+  getStreamer().emitCOFFSymbolType(Type);
   return false;
 }
 
 bool VPEAsmParser::ParseDirectiveEndef(StringRef, SMLoc) {
   Lex();
-  getStreamer().EndCOFFSymbolDef();
+  getStreamer().endCOFFSymbolDef();
   return false;
 }
 
@@ -456,7 +456,7 @@ bool VPEAsmParser::ParseDirectiveSecRel32(StringRef, SMLoc) {
   MCSymbol *Symbol = getContext().getOrCreateSymbol(SymbolID);
 
   Lex();
-  getStreamer().EmitCOFFSecRel32(Symbol, Offset);
+  getStreamer().emitCOFFSecRel32(Symbol, Offset);
   return false;
 }
 
@@ -482,7 +482,7 @@ bool VPEAsmParser::ParseDirectiveRVA(StringRef, SMLoc) {
 
     MCSymbol *Symbol = getContext().getOrCreateSymbol(SymbolID);
 
-    getStreamer().EmitCOFFImgRel32(Symbol, Offset);
+    getStreamer().emitCOFFImgRel32(Symbol, Offset);
     return false;
   };
 
@@ -502,7 +502,7 @@ bool VPEAsmParser::ParseDirectiveSecIdx(StringRef, SMLoc) {
   MCSymbol *Symbol = getContext().getOrCreateSymbol(SymbolID);
 
   Lex();
-  getStreamer().EmitCOFFSectionIndex(Symbol);
+  getStreamer().emitCOFFSectionIndex(Symbol);
   return false;
 }
 
@@ -517,23 +517,23 @@ bool VPEAsmParser::ParseDirectiveSymIdx(StringRef, SMLoc) {
   MCSymbol *Symbol = getContext().getOrCreateSymbol(SymbolID);
 
   Lex();
-  getStreamer().EmitCOFFSymbolIndex(Symbol);
+  getStreamer().emitCOFFSymbolIndex(Symbol);
   return false;
 }
 
 /// ::= [ identifier ]
-bool VPEAsmParser::parseCOMDATType(COFF::COMDATType &Type) {
+bool VPEAsmParser::parseCOMDATType(VPE::COMDATType &Type) {
   StringRef TypeId = getTok().getIdentifier();
 
-  Type = StringSwitch<COFF::COMDATType>(TypeId)
-    .Case("one_only", COFF::IMAGE_COMDAT_SELECT_NODUPLICATES)
-    .Case("discard", COFF::IMAGE_COMDAT_SELECT_ANY)
-    .Case("same_size", COFF::IMAGE_COMDAT_SELECT_SAME_SIZE)
-    .Case("same_contents", COFF::IMAGE_COMDAT_SELECT_EXACT_MATCH)
-    .Case("associative", COFF::IMAGE_COMDAT_SELECT_ASSOCIATIVE)
-    .Case("largest", COFF::IMAGE_COMDAT_SELECT_LARGEST)
-    .Case("newest", COFF::IMAGE_COMDAT_SELECT_NEWEST)
-    .Default((COFF::COMDATType)0);
+  Type = StringSwitch<VPE::COMDATType>(TypeId)
+    .Case("one_only", VPE::IMAGE_COMDAT_SELECT_NODUPLICATES)
+    .Case("discard", VPE::IMAGE_COMDAT_SELECT_ANY)
+    .Case("same_size", VPE::IMAGE_COMDAT_SELECT_SAME_SIZE)
+    .Case("same_contents", VPE::IMAGE_COMDAT_SELECT_EXACT_MATCH)
+    .Case("associative", VPE::IMAGE_COMDAT_SELECT_ASSOCIATIVE)
+    .Case("largest", VPE::IMAGE_COMDAT_SELECT_LARGEST)
+    .Case("newest", VPE::IMAGE_COMDAT_SELECT_NEWEST)
+    .Default((VPE::COMDATType)0);
 
   if (Type == 0)
     return TokError(Twine("unrecognized COMDAT type '" + TypeId + "'"));
@@ -546,7 +546,7 @@ bool VPEAsmParser::parseCOMDATType(COFF::COMDATType &Type) {
 /// ParseDirectiveLinkOnce
 ///  ::= .linkonce [ identifier ]
 bool VPEAsmParser::ParseDirectiveLinkOnce(StringRef, SMLoc Loc) {
-  COFF::COMDATType Type = COFF::IMAGE_COMDAT_SELECT_ANY;
+  VPE::COMDATType Type = VPE::IMAGE_COMDAT_SELECT_ANY;
   if (getLexer().is(AsmToken::Identifier))
     if (parseCOMDATType(Type))
       return true;
@@ -554,10 +554,10 @@ bool VPEAsmParser::ParseDirectiveLinkOnce(StringRef, SMLoc Loc) {
   const MCSectionVPE *Current =
       static_cast<const MCSectionVPE *>(getStreamer().getCurrentSectionOnly());
 
-  if (Type == COFF::IMAGE_COMDAT_SELECT_ASSOCIATIVE)
+  if (Type == VPE::IMAGE_COMDAT_SELECT_ASSOCIATIVE)
     return Error(Loc, "cannot make section associative with .linkonce");
 
-  if (Current->getCharacteristics() & COFF::IMAGE_SCN_LNK_COMDAT)
+  if (Current->getCharacteristics() & VPE::IMAGE_SCN_LNK_COMDAT)
     return Error(Loc, Twine("section '") + Current->getName() +
                                                        "' is already linkonce");
 

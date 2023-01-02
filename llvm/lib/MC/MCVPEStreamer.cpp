@@ -14,7 +14,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/BinaryFormat/COFF.h"
+#include "llvm/BinaryFormat/VPE.h"
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCCodeEmitter.h"
@@ -66,20 +66,21 @@ void MCVPEStreamer::emitInstToData(const MCInst &Inst,
   DF->getContents().append(Code.begin(), Code.end());
 }
 
-void MCVPEStreamer::InitSections(bool NoExecStack) {
-  // FIXME: this is identical to the ELF one.
+void MCVPEStreamer::initSections(bool NoExecStack,
+                                 const MCSubtargetInfo &STI) {
+  // FIXME: this is identical to the ELF and COFF one.
   // This emulates the same behavior of GNU as. This makes it easier
   // to compare the output as the major sections are in the same order.
-  SwitchSection(getContext().getObjectFileInfo()->getTextSection());
-  emitCodeAlignment(4);
+  switchSection(getContext().getObjectFileInfo()->getTextSection());
+  emitCodeAlignment(Align(4), &STI);
 
-  SwitchSection(getContext().getObjectFileInfo()->getDataSection());
-  emitCodeAlignment(4);
+  switchSection(getContext().getObjectFileInfo()->getDataSection());
+  emitCodeAlignment(Align(4), &STI);
 
-  SwitchSection(getContext().getObjectFileInfo()->getBSSSection());
-  emitCodeAlignment(4);
+  switchSection(getContext().getObjectFileInfo()->getBSSSection());
+  emitCodeAlignment(Align(4), &STI);
 
-  SwitchSection(getContext().getObjectFileInfo()->getTextSection());
+  switchSection(getContext().getObjectFileInfo()->getTextSection());
 }
 
 void MCVPEStreamer::emitLabel(MCSymbol *S, SMLoc Loc) {
@@ -92,7 +93,7 @@ void MCVPEStreamer::emitAssemblerFlag(MCAssemblerFlag Flag) {
   getAssembler().getBackend().handleAssemblerFlag(Flag);
 
   switch (Flag) {
-  // None of these require COFF specific handling.
+  // None of these require VPE specific handling.
   case MCAF_SyntaxUnified:
   case MCAF_Code16:
   case MCAF_Code32:
@@ -133,7 +134,7 @@ void MCVPEStreamer::emitSymbolDesc(MCSymbol *Symbol, unsigned DescValue) {
   llvm_unreachable("not implemented");
 }
 
-void MCVPEStreamer::BeginCOFFSymbolDef(MCSymbol const *S) {
+void MCVPEStreamer::beginCOFFSymbolDef(MCSymbol const *S) {
   auto *Symbol = cast<MCSymbolVPE>(S);
   if (CurSymbol)
     Error("starting a new symbol definition without completing the "
@@ -141,13 +142,13 @@ void MCVPEStreamer::BeginCOFFSymbolDef(MCSymbol const *S) {
   CurSymbol = Symbol;
 }
 
-void MCVPEStreamer::EmitCOFFSymbolStorageClass(int StorageClass) {
+void MCVPEStreamer::emitCOFFSymbolStorageClass(int StorageClass) {
   if (!CurSymbol) {
     Error("storage class specified outside of symbol definition");
     return;
   }
 
-  if (StorageClass & ~COFF::SSC_Invalid) {
+  if (StorageClass & ~VPE::SSC_Invalid) {
     Error("storage class value '" + Twine(StorageClass) +
                "' out of range");
     return;
@@ -157,7 +158,7 @@ void MCVPEStreamer::EmitCOFFSymbolStorageClass(int StorageClass) {
   cast<MCSymbolVPE>(CurSymbol)->setClass((uint16_t)StorageClass);
 }
 
-void MCVPEStreamer::EmitCOFFSymbolType(int Type) {
+void MCVPEStreamer::emitCOFFSymbolType(int Type) {
   if (!CurSymbol) {
     Error("symbol type specified outside of a symbol definition");
     return;
@@ -172,24 +173,23 @@ void MCVPEStreamer::EmitCOFFSymbolType(int Type) {
   cast<MCSymbolVPE>(CurSymbol)->setType((uint16_t)Type);
 }
 
-void MCVPEStreamer::EndCOFFSymbolDef() {
+void MCVPEStreamer::endCOFFSymbolDef() {
   if (!CurSymbol)
     Error("ending symbol definition without starting one");
   CurSymbol = nullptr;
 }
 
-void MCVPEStreamer::EmitCOFFSymbolIndex(MCSymbol const *Symbol) {
+void MCVPEStreamer::emitCOFFSymbolIndex(MCSymbol const *Symbol) {
   MCSection *Sec = getCurrentSectionOnly();
   getAssembler().registerSection(*Sec);
-  if (Sec->getAlignment() < 4)
-    Sec->setAlignment(Align(4));
+  Sec->ensureMinAlignment(Align(4));
 
   new MCSymbolIdFragment(Symbol, getCurrentSectionOnly());
 
   getAssembler().registerSymbol(*Symbol);
 }
 
-void MCVPEStreamer::EmitCOFFSectionIndex(const MCSymbol *Symbol) {
+void MCVPEStreamer::emitCOFFSectionIndex(const MCSymbol *Symbol) {
   visitUsedSymbol(*Symbol);
   MCDataFragment *DF = getOrCreateDataFragment();
   const MCSymbolRefExpr *SRE = MCSymbolRefExpr::create(Symbol, getContext());
@@ -198,8 +198,8 @@ void MCVPEStreamer::EmitCOFFSectionIndex(const MCSymbol *Symbol) {
   DF->getContents().resize(DF->getContents().size() + 2, 0);
 }
 
-void MCVPEStreamer::EmitCOFFSecRel32(const MCSymbol *Symbol,
-                                         uint64_t Offset) {
+void MCVPEStreamer::emitCOFFSecRel32(const MCSymbol *Symbol,
+                                     uint64_t Offset) {
   visitUsedSymbol(*Symbol);
   MCDataFragment *DF = getOrCreateDataFragment();
   // Create Symbol A for the relocation relative reference.
@@ -216,8 +216,8 @@ void MCVPEStreamer::EmitCOFFSecRel32(const MCSymbol *Symbol,
   DF->getContents().resize(DF->getContents().size() + 4, 0);
 }
 
-void MCVPEStreamer::EmitCOFFImgRel32(const MCSymbol *Symbol,
-                                         int64_t Offset) {
+void MCVPEStreamer::emitCOFFImgRel32(const MCSymbol *Symbol,
+                                     int64_t Offset) {
   visitUsedSymbol(*Symbol);
   MCDataFragment *DF = getOrCreateDataFragment();
   // Create Symbol A for the relocation relative reference.
@@ -236,7 +236,7 @@ void MCVPEStreamer::EmitCOFFImgRel32(const MCSymbol *Symbol,
 }
 
 void MCVPEStreamer::emitCommonSymbol(MCSymbol *S, uint64_t Size,
-                                     unsigned ByteAlignment) {
+                                     Align ByteAlignment) {
   auto *Symbol = cast<MCSymbolVPE>(S);
 
   getAssembler().registerSymbol(*Symbol);
@@ -249,27 +249,27 @@ void MCVPEStreamer::emitCommonSymbol(MCSymbol *S, uint64_t Size,
     const MCObjectFileInfo *MFI = getContext().getObjectFileInfo();
 
     OS << " -aligncomm:\"" << Symbol->getName() << "\","
-       << Log2_32_Ceil(ByteAlignment);
+       << Log2_32_Ceil(ByteAlignment.value());
 
-    PushSection();
-    SwitchSection(MFI->getDrectveSection());
+    pushSection();
+    switchSection(MFI->getDrectveSection());
     emitBytes(Directive);
-    PopSection();
+    popSection();
   }
 }
 
 void MCVPEStreamer::emitLocalCommonSymbol(MCSymbol *S, uint64_t Size,
-                                              unsigned ByteAlignment) {
+                                          Align ByteAlignment) {
   auto *Symbol = cast<MCSymbolVPE>(S);
 
   MCSection *Section = getContext().getObjectFileInfo()->getBSSSection();
-  PushSection();
-  SwitchSection(Section);
+  pushSection();
+  switchSection(Section);
   emitValueToAlignment(ByteAlignment, 0, 1, 0);
   emitLabel(Symbol);
   Symbol->setExternal(false);
   emitZeros(Size);
-  PopSection();
+  popSection();
 }
 
 void MCVPEStreamer::emitWeakReference(MCSymbol *AliasS,
@@ -283,13 +283,13 @@ void MCVPEStreamer::emitWeakReference(MCSymbol *AliasS,
 }
 
 void MCVPEStreamer::emitZerofill(MCSection *Section, MCSymbol *Symbol,
-                                 uint64_t Size, unsigned ByteAlignment,
+                                 uint64_t Size, Align ByteAlignment,
                                  SMLoc Loc) {
   llvm_unreachable("not implemented");
 }
 
 void MCVPEStreamer::emitTBSSSymbol(MCSection *Section, MCSymbol *Symbol,
-                                   uint64_t Size, unsigned ByteAlignment) {
+                                   uint64_t Size, Align ByteAlignment) {
   llvm_unreachable("not implemented");
 }
 

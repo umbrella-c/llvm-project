@@ -4506,6 +4506,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       (IsCuda || IsHIP) ? TC.getAuxTriple() : nullptr;
   bool IsWindowsMSVC = RawTriple.isWindowsMSVCEnvironment();
   bool IsIAMCU = RawTriple.isOSIAMCU();
+  bool IsVali = RawTriple.isOSVali();
 
   // Adjust IsWindowsXYZ for CUDA/HIP compilations.  Even when compiling in
   // device mode (i.e., getToolchain().getTriple() is NVPTX/AMDGCN, not
@@ -6482,7 +6483,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // -fms-extensions=0 is default.
   if (Args.hasFlag(options::OPT_fms_extensions, options::OPT_fno_ms_extensions,
-                   IsWindowsMSVC))
+                   IsWindowsMSVC | IsVali))
     CmdArgs.push_back("-fms-extensions");
 
   // -fms-compatibility=0 is default.

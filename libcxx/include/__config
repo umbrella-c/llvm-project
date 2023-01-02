@@ -515,12 +515,18 @@ typedef __char32_t char32_t;
 #      endif
 #      define _LIBCPP_OVERRIDABLE_FUNC_VIS _LIBCPP_DLL_VIS
 #      define _LIBCPP_EXPORTED_FROM_ABI __declspec(dllexport)
-#    else
+#    elif defined(_DLL)
 #      define _LIBCPP_DLL_VIS __declspec(dllimport)
 #      define _LIBCPP_EXTERN_TEMPLATE_TYPE_VIS _LIBCPP_DLL_VIS
 #      define _LIBCPP_CLASS_TEMPLATE_INSTANTIATION_VIS
 #      define _LIBCPP_OVERRIDABLE_FUNC_VIS
 #      define _LIBCPP_EXPORTED_FROM_ABI __declspec(dllimport)
+#    else
+#      define _LIBCPP_DLL_VIS
+#      define _LIBCPP_EXTERN_TEMPLATE_TYPE_VIS
+#      define _LIBCPP_CLASS_TEMPLATE_INSTANTIATION_VIS
+#      define _LIBCPP_OVERRIDABLE_FUNC_VIS
+#      define _LIBCPP_EXPORTED_FROM_ABI
 #    endif
 
 #    define _LIBCPP_TYPE_VIS _LIBCPP_DLL_VIS

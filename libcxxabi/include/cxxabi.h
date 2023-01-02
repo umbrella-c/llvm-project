@@ -27,7 +27,7 @@
 
 namespace std {
 #if defined(_WIN32) || defined(__MOLLENOS__)
-class _LIBCXXABI_TYPE_VIS type_info; // forward declaration
+class _LIBCPP_DLL_VIS type_info; // forward declaration
 #else
 class type_info; // forward declaration
 #endif

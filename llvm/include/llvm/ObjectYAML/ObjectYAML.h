@@ -18,6 +18,7 @@
 #include "llvm/ObjectYAML/OffloadYAML.h"
 #include "llvm/ObjectYAML/WasmYAML.h"
 #include "llvm/ObjectYAML/XCOFFYAML.h"
+#include "llvm/ObjectYAML/VPEYAML.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <memory>
 
@@ -36,6 +37,7 @@ struct YamlObjectFile {
   std::unique_ptr<OffloadYAML::Binary> Offload;
   std::unique_ptr<WasmYAML::Object> Wasm;
   std::unique_ptr<XCOFFYAML::Object> Xcoff;
+  std::unique_ptr<VPEYAML::Object> Vpe;
   std::unique_ptr<DXContainerYAML::Object> DXContainer;
 };
 

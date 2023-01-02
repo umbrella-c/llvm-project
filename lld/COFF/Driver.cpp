@@ -482,6 +482,7 @@ StringRef LinkerDriver::doFindFile(StringRef filename) {
         sys::path::replace_extension(path, ".dll.lib");
         if (sys::fs::exists(path.str()))
           return saver().save(path.str());
+      }
     }
   }
   return filename;
@@ -530,7 +531,7 @@ StringRef LinkerDriver::doFindLibVPE(StringRef filename) {
 
   SmallString<128> s = filename;
   sys::path::replace_extension(s, ".dll.lib");
-  StringRef libName = saver.save(s.str());
+  StringRef libName = saver().save(s.str());
   return doFindFile(libName);
 }
 

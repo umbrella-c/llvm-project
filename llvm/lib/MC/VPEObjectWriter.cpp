@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains an implementation of a VPE COFF object file writer.
+// This file contains an implementation of a VPE object file writer.
 //
 //===----------------------------------------------------------------------===//
 
@@ -18,7 +18,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
-#include "llvm/BinaryFormat/COFF.h"
+#include "llvm/BinaryFormat/VPE.h"
 #include "llvm/MC/MCAsmLayout.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCContext.h"
@@ -57,7 +57,9 @@ using llvm::support::endian::write32le;
 
 namespace {
 
-using name = SmallString<COFF::NameSize>;
+constexpr int OffsetLabelIntervalBits = 20;
+
+using name = SmallString<VPE::NameSize>;
 
 enum AuxiliaryType {
   ATWeakExternal,
@@ -67,14 +69,14 @@ enum AuxiliaryType {
 
 struct AuxSymbol {
   AuxiliaryType AuxType;
-  COFF::Auxiliary Aux;
+  VPE::Auxiliary Aux;
 };
 
 class VPESection;
 
 class VPESymbol {
 public:
-  COFF::symbol Data = {};
+  VPE::symbol Data = {};
 
   using AuxiliarySymbols = SmallVector<AuxSymbol, 1>;
 
@@ -100,19 +102,19 @@ public:
 
 // This class contains staging data for a COFF relocation entry.
 struct VPERelocation {
-  COFF::relocation Data;
+  VPE::relocation Data;
   VPESymbol *Symb = nullptr;
 
   VPERelocation() = default;
 
-  static size_t size() { return COFF::RelocationSize; }
+  static size_t size() { return VPE::RelocationSize; }
 };
 
 using relocations = std::vector<VPERelocation>;
 
 class VPESection {
 public:
-  COFF::section Header = {};
+  VPE::section Header = {};
 
   std::string Name;
   int Number;
@@ -120,7 +122,9 @@ public:
   VPESymbol *Symbol = nullptr;
   relocations Relocations;
 
-  VPESection(StringRef Name) : Name(Name) {}
+  VPESection(StringRef Name) : Name(std::string(Name)) {}
+
+  SmallVector<VPESymbol *, 1> OffsetSymbols;
 };
 
 class VPEObjectWriter : public MCObjectWriter {
@@ -138,7 +142,7 @@ public:
   std::unique_ptr<MCVPEObjectTargetWriter> TargetObjectWriter;
 
   // Root level file contents.
-  COFF::header Header = {};
+  VPE::header Header = {};
   sections Sections;
   symbols Symbols;
   StringTableBuilder Strings{StringTableBuilder::WinCOFF}; // reuse wincoff
@@ -150,10 +154,9 @@ public:
   symbol_list WeakDefaults;
 
   bool UseBigObj;
+  bool UseOffsetLabels = false;
 
-  bool EmitAddrsigSection = false;
   MCSectionVPE *AddrsigSection;
-  std::vector<const MCSymbol *> AddrsigSyms;
 
   MCSectionVPE *CGProfileSection = nullptr;
 
@@ -175,7 +178,8 @@ public:
   VPESymbol *GetOrCreateVPESymbol(const MCSymbol *Symbol);
   VPESection *createSection(StringRef Name);
 
-  void defineSection(MCSectionVPE const &Sec);
+  void defineSection(const MCSectionVPE &MCSec,
+                     const MCAsmLayout &Layout);
 
   VPESymbol *getLinkedSymbol(const MCSymbol &Symbol);
   void DefineSymbol(const MCSymbol &Symbol, MCAssembler &Assembler,
@@ -188,11 +192,11 @@ public:
 
   // Entity writing methods.
 
-  void WriteFileHeader(const COFF::header &Header);
+  void WriteFileHeader(const VPE::header &Header);
   void WriteSymbol(const VPESymbol &S);
   void WriteAuxiliarySymbols(const VPESymbol::AuxiliarySymbols &S);
   void writeSectionHeaders();
-  void WriteRelocation(const COFF::relocation &R);
+  void WriteRelocation(const VPE::relocation &R);
   uint32_t writeSectionContents(MCAssembler &Asm, const MCAsmLayout &Layout,
                                 const MCSection &MCSec);
   void writeSection(MCAssembler &Asm, const MCAsmLayout &Layout,
@@ -217,11 +221,6 @@ public:
   void assignSectionNumbers();
   void assignFileOffsets(MCAssembler &Asm, const MCAsmLayout &Layout);
 
-  void emitAddrsigSection() override { EmitAddrsigSection = true; }
-  void addAddrsigSymbol(const MCSymbol *Sym) override {
-    AddrsigSyms.push_back(Sym);
-  }
-
   uint64_t writeObject(MCAssembler &Asm, const MCAsmLayout &Layout) override;
 };
 
@@ -245,6 +244,11 @@ VPEObjectWriter::VPEObjectWriter(
     std::unique_ptr<MCVPEObjectTargetWriter> MOTW, raw_pwrite_stream &OS)
     : W(OS, support::little), TargetObjectWriter(std::move(MOTW)) {
   Header.Machine = TargetObjectWriter->getMachine();
+  // Some relocations on ARM64 (the 21 bit ADRP relocations) have a slightly
+  // limited range for the immediate offset (+/- 1 MB); create extra offset
+  // label symbols with regular intervals to allow referencing a
+  // non-temporary symbol that is close enough.
+  UseOffsetLabels = Header.Machine == VPE::IMAGE_FILE_MACHINE_ARM64;
 }
 
 VPESymbol *VPEObjectWriter::createSymbol(StringRef Name) {
@@ -265,50 +269,51 @@ VPESection *VPEObjectWriter::createSection(StringRef Name) {
 }
 
 static uint32_t getAlignment(const MCSectionVPE &Sec) {
-  switch (Sec.getAlignment()) {
+  switch (Sec.getAlign().value()) {
   case 1:
-    return COFF::IMAGE_SCN_ALIGN_1BYTES;
+    return VPE::IMAGE_SCN_ALIGN_1BYTES;
   case 2:
-    return COFF::IMAGE_SCN_ALIGN_2BYTES;
+    return VPE::IMAGE_SCN_ALIGN_2BYTES;
   case 4:
-    return COFF::IMAGE_SCN_ALIGN_4BYTES;
+    return VPE::IMAGE_SCN_ALIGN_4BYTES;
   case 8:
-    return COFF::IMAGE_SCN_ALIGN_8BYTES;
+    return VPE::IMAGE_SCN_ALIGN_8BYTES;
   case 16:
-    return COFF::IMAGE_SCN_ALIGN_16BYTES;
+    return VPE::IMAGE_SCN_ALIGN_16BYTES;
   case 32:
-    return COFF::IMAGE_SCN_ALIGN_32BYTES;
+    return VPE::IMAGE_SCN_ALIGN_32BYTES;
   case 64:
-    return COFF::IMAGE_SCN_ALIGN_64BYTES;
+    return VPE::IMAGE_SCN_ALIGN_64BYTES;
   case 128:
-    return COFF::IMAGE_SCN_ALIGN_128BYTES;
+    return VPE::IMAGE_SCN_ALIGN_128BYTES;
   case 256:
-    return COFF::IMAGE_SCN_ALIGN_256BYTES;
+    return VPE::IMAGE_SCN_ALIGN_256BYTES;
   case 512:
-    return COFF::IMAGE_SCN_ALIGN_512BYTES;
+    return VPE::IMAGE_SCN_ALIGN_512BYTES;
   case 1024:
-    return COFF::IMAGE_SCN_ALIGN_1024BYTES;
+    return VPE::IMAGE_SCN_ALIGN_1024BYTES;
   case 2048:
-    return COFF::IMAGE_SCN_ALIGN_2048BYTES;
+    return VPE::IMAGE_SCN_ALIGN_2048BYTES;
   case 4096:
-    return COFF::IMAGE_SCN_ALIGN_4096BYTES;
+    return VPE::IMAGE_SCN_ALIGN_4096BYTES;
   case 8192:
-    return COFF::IMAGE_SCN_ALIGN_8192BYTES;
+    return VPE::IMAGE_SCN_ALIGN_8192BYTES;
   }
   llvm_unreachable("unsupported section alignment");
 }
 
 /// This function takes a section data object from the assembler
-/// and creates the associated COFF section staging object.
-void VPEObjectWriter::defineSection(const MCSectionVPE &MCSec) {
+/// and creates the associated VPE section staging object.
+void VPEObjectWriter::defineSection(const MCSectionVPE &MCSec,
+                                    const MCAsmLayout &Layout) {
   VPESection *Section = createSection(MCSec.getName());
   VPESymbol *Symbol = createSymbol(MCSec.getName());
   Section->Symbol = Symbol;
   Symbol->Section = Section;
-  Symbol->Data.StorageClass = COFF::IMAGE_SYM_CLASS_STATIC;
+  Symbol->Data.StorageClass = VPE::IMAGE_SYM_CLASS_STATIC;
 
   // Create a COMDAT symbol if needed.
-  if (MCSec.getSelection() != COFF::IMAGE_COMDAT_SELECT_ASSOCIATIVE) {
+  if (MCSec.getSelection() != VPE::IMAGE_COMDAT_SELECT_ASSOCIATIVE) {
     if (const MCSymbol *S = MCSec.getCOMDATSymbol()) {
       VPESymbol *COMDATSymbol = GetOrCreateVPESymbol(S);
       if (COMDATSymbol->Section)
@@ -330,6 +335,20 @@ void VPEObjectWriter::defineSection(const MCSectionVPE &MCSec) {
   // Bind internal COFF section to MC section.
   Section->MCSection = &MCSec;
   SectionMap[&MCSec] = Section;
+
+  if (UseOffsetLabels && !MCSec.getFragmentList().empty()) {
+    const uint32_t Interval = 1 << OffsetLabelIntervalBits;
+    uint32_t N = 1;
+    for (uint32_t Off = Interval, E = Layout.getSectionAddressSize(&MCSec);
+         Off < E; Off += Interval) {
+      auto Name = ("$L" + MCSec.getName() + "_" + Twine(N++)).str();
+      VPESymbol *Label = createSymbol(Name);
+      Label->Section = Section;
+      Label->Data.StorageClass = VPE::IMAGE_SYM_CLASS_LABEL;
+      Label->Data.Value = Off;
+      Section->OffsetSymbols.push_back(Label);
+    }
+  }
 }
 
 static uint64_t getSymbolValue(const MCSymbol &Symbol,
@@ -376,7 +395,7 @@ void VPEObjectWriter::DefineSymbol(const MCSymbol &MCSym,
 
   VPESymbol *Local = nullptr;
   if (cast<MCSymbolVPE>(MCSym).isWeakExternal()) {
-    Sym->Data.StorageClass = COFF::IMAGE_SYM_CLASS_WEAK_EXTERNAL;
+    Sym->Data.StorageClass = VPE::IMAGE_SYM_CLASS_WEAK_EXTERNAL;
     Sym->Section = nullptr;
 
     VPESymbol *WeakDefault = getLinkedSymbol(MCSym);
@@ -384,7 +403,7 @@ void VPEObjectWriter::DefineSymbol(const MCSymbol &MCSym,
       std::string WeakName = (".weak." + MCSym.getName() + ".default").str();
       WeakDefault = createSymbol(WeakName);
       if (!Sec)
-        WeakDefault->Data.SectionNumber = COFF::IMAGE_SYM_ABSOLUTE;
+        WeakDefault->Data.SectionNumber = VPE::IMAGE_SYM_ABSOLUTE;
       else
         WeakDefault->Section = Sec;
       WeakDefaults.insert(WeakDefault);
@@ -399,10 +418,10 @@ void VPEObjectWriter::DefineSymbol(const MCSymbol &MCSym,
     Sym->Aux[0].AuxType = ATWeakExternal;
     Sym->Aux[0].Aux.WeakExternal.TagIndex = 0;
     Sym->Aux[0].Aux.WeakExternal.Characteristics =
-        COFF::IMAGE_WEAK_EXTERN_SEARCH_ALIAS;
+        VPE::IMAGE_WEAK_EXTERN_SEARCH_ALIAS;
   } else {
     if (!Base)
-      Sym->Data.SectionNumber = COFF::IMAGE_SYM_ABSOLUTE;
+      Sym->Data.SectionNumber = VPE::IMAGE_SYM_ABSOLUTE;
     else
       Sym->Section = Sec;
     Local = Sym;
@@ -416,12 +435,12 @@ void VPEObjectWriter::DefineSymbol(const MCSymbol &MCSym,
     Local->Data.StorageClass = SymbolCOFF.getClass();
 
     // If no storage class was specified in the streamer, define it here.
-    if (Local->Data.StorageClass == COFF::IMAGE_SYM_CLASS_NULL) {
+    if (Local->Data.StorageClass == VPE::IMAGE_SYM_CLASS_NULL) {
       bool IsExternal = MCSym.isExternal() ||
                         (!MCSym.getFragment() && !MCSym.isVariable());
 
-      Local->Data.StorageClass = IsExternal ? COFF::IMAGE_SYM_CLASS_EXTERNAL
-                                            : COFF::IMAGE_SYM_CLASS_STATIC;
+      Local->Data.StorageClass = IsExternal ? VPE::IMAGE_SYM_CLASS_EXTERNAL
+                                            : VPE::IMAGE_SYM_CLASS_STATIC;
     }
   }
 
@@ -455,16 +474,16 @@ static void encodeBase64StringEntry(char *Buffer, uint64_t Value) {
 }
 
 void VPEObjectWriter::SetSectionName(VPESection &S) {
-  if (S.Name.size() <= COFF::NameSize) {
+  if (S.Name.size() <= VPE::NameSize) {
     std::memcpy(S.Header.Name, S.Name.c_str(), S.Name.size());
     return;
   }
 
   uint64_t StringTableEntry = Strings.getOffset(S.Name);
   if (StringTableEntry <= Max7DecimalOffset) {
-    SmallVector<char, COFF::NameSize> Buffer;
+    SmallVector<char, VPE::NameSize> Buffer;
     Twine('/').concat(Twine(StringTableEntry)).toVector(Buffer);
-    assert(Buffer.size() <= COFF::NameSize && Buffer.size() >= 2);
+    assert(Buffer.size() <= VPE::NameSize && Buffer.size() >= 2);
     std::memcpy(S.Header.Name, Buffer.data(), Buffer.size());
     return;
   }
@@ -477,28 +496,28 @@ void VPEObjectWriter::SetSectionName(VPESection &S) {
 }
 
 void VPEObjectWriter::SetSymbolName(VPESymbol &S) {
-  if (S.Name.size() > COFF::NameSize)
+  if (S.Name.size() > VPE::NameSize)
     S.set_name_offset(Strings.getOffset(S.Name));
   else
     std::memcpy(S.Data.Name, S.Name.c_str(), S.Name.size());
 }
 
 bool VPEObjectWriter::IsPhysicalSection(VPESection *S) {
-  return (S->Header.Characteristics & COFF::IMAGE_SCN_CNT_UNINITIALIZED_DATA) ==
+  return (S->Header.Characteristics & VPE::IMAGE_SCN_CNT_UNINITIALIZED_DATA) ==
          0;
 }
 
 //------------------------------------------------------------------------------
 // entity writing methods
 
-void VPEObjectWriter::WriteFileHeader(const COFF::header &Header) {
+void VPEObjectWriter::WriteFileHeader(const VPE::header &Header) {
   if (UseBigObj) {
-    W.write<uint16_t>(COFF::IMAGE_FILE_MACHINE_UNKNOWN);
+    W.write<uint16_t>(VPE::IMAGE_FILE_MACHINE_UNKNOWN);
     W.write<uint16_t>(0xFFFF);
-    W.write<uint16_t>(COFF::BigObjHeader::MinBigObjectVersion);
+    W.write<uint16_t>(VPE::BigObjHeader::MinBigObjectVersion);
     W.write<uint16_t>(Header.Machine);
     W.write<uint32_t>(Header.TimeDateStamp);
-    W.OS.write(COFF::BigObjMagic, sizeof(COFF::BigObjMagic));
+    W.OS.write(VPE::BigObjMagic, sizeof(VPE::BigObjMagic));
     W.write<uint32_t>(0);
     W.write<uint32_t>(0);
     W.write<uint32_t>(0);
@@ -518,7 +537,7 @@ void VPEObjectWriter::WriteFileHeader(const COFF::header &Header) {
 }
 
 void VPEObjectWriter::WriteSymbol(const VPESymbol &S) {
-  W.OS.write(S.Data.Name, COFF::NameSize);
+  W.OS.write(S.Data.Name, VPE::NameSize);
   W.write<uint32_t>(S.Data.Value);
   if (UseBigObj)
     W.write<uint32_t>(S.Data.SectionNumber);
@@ -539,11 +558,11 @@ void VPEObjectWriter::WriteAuxiliarySymbols(
       W.write<uint32_t>(i.Aux.WeakExternal.Characteristics);
       W.OS.write_zeros(sizeof(i.Aux.WeakExternal.unused));
       if (UseBigObj)
-        W.OS.write_zeros(COFF::Symbol32Size - COFF::Symbol16Size);
+        W.OS.write_zeros(VPE::Symbol32Size - VPE::Symbol16Size);
       break;
     case ATFile:
       W.OS.write(reinterpret_cast<const char *>(&i.Aux),
-                        UseBigObj ? COFF::Symbol32Size : COFF::Symbol16Size);
+                        UseBigObj ? VPE::Symbol32Size : VPE::Symbol16Size);
       break;
     case ATSectionDefinition:
       W.write<uint32_t>(i.Aux.SectionDefinition.Length);
@@ -555,7 +574,7 @@ void VPEObjectWriter::WriteAuxiliarySymbols(
       W.OS.write_zeros(sizeof(i.Aux.SectionDefinition.unused));
       W.write<uint16_t>(static_cast<int16_t>(i.Aux.SectionDefinition.Number >> 16));
       if (UseBigObj)
-        W.OS.write_zeros(COFF::Symbol32Size - COFF::Symbol16Size);
+        W.OS.write_zeros(VPE::Symbol32Size - VPE::Symbol16Size);
       break;
     }
   }
@@ -577,10 +596,10 @@ void VPEObjectWriter::writeSectionHeaders() {
     if (Section->Number == -1)
       continue;
 
-    COFF::section &S = Section->Header;
+    VPE::section &S = Section->Header;
     if (Section->Relocations.size() >= 0xffff)
-      S.Characteristics |= COFF::IMAGE_SCN_LNK_NRELOC_OVFL;
-    W.OS.write(S.Name, COFF::NameSize);
+      S.Characteristics |= VPE::IMAGE_SCN_LNK_NRELOC_OVFL;
+    W.OS.write(S.Name, VPE::NameSize);
     W.write<uint32_t>(S.VirtualSize);
     W.write<uint32_t>(S.VirtualAddress);
     W.write<uint32_t>(S.SizeOfRawData);
@@ -593,7 +612,7 @@ void VPEObjectWriter::writeSectionHeaders() {
   }
 }
 
-void VPEObjectWriter::WriteRelocation(const COFF::relocation &R) {
+void VPEObjectWriter::WriteRelocation(const VPE::relocation &R) {
   W.write<uint32_t>(R.VirtualAddress);
   W.write<uint32_t>(R.SymbolTableIndex);
   W.write<uint16_t>(R.Type);
@@ -656,7 +675,7 @@ void VPEObjectWriter::writeSection(MCAssembler &Asm,
   if (Sec.Relocations.size() >= 0xffff) {
     // In case of overflow, write actual relocation count as first
     // relocation. Including the synthetic reloc itself (+ 1).
-    COFF::relocation R;
+    VPE::relocation R;
     R.VirtualAddress = Sec.Relocations.size() + 1;
     R.SymbolTableIndex = 0;
     R.Type = 0;
@@ -671,17 +690,17 @@ void VPEObjectWriter::writeSection(MCAssembler &Asm,
 // MCObjectWriter interface implementations
 
 void VPEObjectWriter::executePostLayoutBinding(MCAssembler &Asm,
-                                                   const MCAsmLayout &Layout) {
+                                              const MCAsmLayout &Layout) {
   if (EmitAddrsigSection) {
     AddrsigSection = Asm.getContext().getVPESection(
-        ".llvm_addrsig", COFF::IMAGE_SCN_LNK_REMOVE,
+        ".llvm_addrsig", VPE::IMAGE_SCN_LNK_REMOVE,
         SectionKind::getMetadata());
     Asm.registerSection(*AddrsigSection);
   }
 
   if (!Asm.CGProfile.empty()) {
     CGProfileSection = Asm.getContext().getVPESection(
-        ".llvm.call-graph-profile", COFF::IMAGE_SCN_LNK_REMOVE,
+        ".llvm.call-graph-profile", VPE::IMAGE_SCN_LNK_REMOVE,
         SectionKind::getMetadata());
     Asm.registerSection(*CGProfileSection);
   }
@@ -689,7 +708,7 @@ void VPEObjectWriter::executePostLayoutBinding(MCAssembler &Asm,
   // "Define" each section & symbol. This creates section & symbol
   // entries in the staging area.
   for (const auto &Section : Asm)
-    defineSection(static_cast<const MCSectionVPE &>(Section));
+    defineSection(static_cast<const MCSectionVPE &>(Section), Layout);
 
   for (const MCSymbol &Symbol : Asm.symbols())
     if (!Symbol.isTemporary())
@@ -706,7 +725,7 @@ bool VPEObjectWriter::isSymbolRefDifferenceFullyResolvedImpl(
   // to approximate the set of all address taken functions. LLD's implementation
   // of /GUARD:CF also relies on the existance of these relocations.
   uint16_t Type = cast<MCSymbolVPE>(SymA).getType();
-  if ((Type >> COFF::SCT_COMPLEX_TYPE_SHIFT) == COFF::IMAGE_SYM_DTYPE_FUNCTION)
+  if ((Type >> VPE::SCT_COMPLEX_TYPE_SHIFT) == VPE::IMAGE_SYM_DTYPE_FUNCTION)
     return false;
   return MCObjectWriter::isSymbolRefDifferenceFullyResolvedImpl(Asm, SymA, FB,
                                                                 InSet, IsPCRel);
@@ -775,8 +794,23 @@ void VPEObjectWriter::recordRelocation(MCAssembler &Asm,
     assert(
         SectionMap.find(TargetSection) != SectionMap.end() &&
         "Section must already have been defined in executePostLayoutBinding!");
-    Reloc.Symb = SectionMap[TargetSection]->Symbol;
+    VPESection *Section = SectionMap[TargetSection];
+    Reloc.Symb = Section->Symbol;
     FixedValue += Layout.getSymbolOffset(A);
+    // Technically, we should do the final adjustments of FixedValue (below)
+    // before picking an offset symbol, otherwise we might choose one which
+    // is slightly too far away. The relocations where it really matters
+    // (arm64 adrp relocations) don't get any offset though.
+    if (UseOffsetLabels && !Section->OffsetSymbols.empty()) {
+      uint64_t LabelIndex = FixedValue >> OffsetLabelIntervalBits;
+      if (LabelIndex > 0) {
+        if (LabelIndex <= Section->OffsetSymbols.size())
+          Reloc.Symb = Section->OffsetSymbols[LabelIndex - 1];
+        else
+          Reloc.Symb = Section->OffsetSymbols.back();
+        FixedValue -= Reloc.Symb->Data.Value;
+      }
+    }
   } else {
     assert(
         SymbolMap.find(&A) != SymbolMap.end() &&
@@ -792,33 +826,33 @@ void VPEObjectWriter::recordRelocation(MCAssembler &Asm,
 
   // The *_REL32 relocations are relative to the end of the relocation,
   // not to the start.
-  if ((Header.Machine == COFF::IMAGE_FILE_MACHINE_AMD64 &&
-       Reloc.Data.Type == COFF::IMAGE_REL_AMD64_REL32) ||
-      (Header.Machine == COFF::IMAGE_FILE_MACHINE_I386 &&
-       Reloc.Data.Type == COFF::IMAGE_REL_I386_REL32) ||
-      (Header.Machine == COFF::IMAGE_FILE_MACHINE_ARMNT &&
-       Reloc.Data.Type == COFF::IMAGE_REL_ARM_REL32) ||
-      (Header.Machine == COFF::IMAGE_FILE_MACHINE_ARM64 &&
-       Reloc.Data.Type == COFF::IMAGE_REL_ARM64_REL32))
+  if ((Header.Machine == VPE::IMAGE_FILE_MACHINE_AMD64 &&
+       Reloc.Data.Type == VPE::IMAGE_REL_AMD64_REL32) ||
+      (Header.Machine == VPE::IMAGE_FILE_MACHINE_I386 &&
+       Reloc.Data.Type == VPE::IMAGE_REL_I386_REL32) ||
+      (Header.Machine == VPE::IMAGE_FILE_MACHINE_ARMNT &&
+       Reloc.Data.Type == VPE::IMAGE_REL_ARM_REL32) ||
+      (Header.Machine == VPE::IMAGE_FILE_MACHINE_ARM64 &&
+       Reloc.Data.Type == VPE::IMAGE_REL_ARM64_REL32))
     FixedValue += 4;
 
-  if (Header.Machine == COFF::IMAGE_FILE_MACHINE_ARMNT) {
+  if (Header.Machine == VPE::IMAGE_FILE_MACHINE_ARMNT) {
     switch (Reloc.Data.Type) {
-    case COFF::IMAGE_REL_ARM_ABSOLUTE:
-    case COFF::IMAGE_REL_ARM_ADDR32:
-    case COFF::IMAGE_REL_ARM_ADDR32NB:
-    case COFF::IMAGE_REL_ARM_TOKEN:
-    case COFF::IMAGE_REL_ARM_SECTION:
-    case COFF::IMAGE_REL_ARM_SECREL:
+    case VPE::IMAGE_REL_ARM_ABSOLUTE:
+    case VPE::IMAGE_REL_ARM_ADDR32:
+    case VPE::IMAGE_REL_ARM_ADDR32NB:
+    case VPE::IMAGE_REL_ARM_TOKEN:
+    case VPE::IMAGE_REL_ARM_SECTION:
+    case VPE::IMAGE_REL_ARM_SECREL:
       break;
-    case COFF::IMAGE_REL_ARM_BRANCH11:
-    case COFF::IMAGE_REL_ARM_BLX11:
+    case VPE::IMAGE_REL_ARM_BRANCH11:
+    case VPE::IMAGE_REL_ARM_BLX11:
     // IMAGE_REL_ARM_BRANCH11 and IMAGE_REL_ARM_BLX11 are only used for
     // pre-ARMv7, which implicitly rules it out of ARMNT (it would be valid
     // for Windows CE).
-    case COFF::IMAGE_REL_ARM_BRANCH24:
-    case COFF::IMAGE_REL_ARM_BLX24:
-    case COFF::IMAGE_REL_ARM_MOV32A:
+    case VPE::IMAGE_REL_ARM_BRANCH24:
+    case VPE::IMAGE_REL_ARM_BLX24:
+    case VPE::IMAGE_REL_ARM_MOV32A:
       // IMAGE_REL_ARM_BRANCH24, IMAGE_REL_ARM_BLX24, IMAGE_REL_ARM_MOV32A are
       // only used for ARM mode code, which is documented as being unsupported
       // by Windows on ARM.  Empirical proof indicates that masm is able to
@@ -826,11 +860,11 @@ void VPEObjectWriter::recordRelocation(MCAssembler &Asm,
       // unable to handle it.
       llvm_unreachable("unsupported relocation");
       break;
-    case COFF::IMAGE_REL_ARM_MOV32T:
+    case VPE::IMAGE_REL_ARM_MOV32T:
       break;
-    case COFF::IMAGE_REL_ARM_BRANCH20T:
-    case COFF::IMAGE_REL_ARM_BRANCH24T:
-    case COFF::IMAGE_REL_ARM_BLX23T:
+    case VPE::IMAGE_REL_ARM_BRANCH20T:
+    case VPE::IMAGE_REL_ARM_BRANCH24T:
+    case VPE::IMAGE_REL_ARM_BLX23T:
       // IMAGE_REL_BRANCH20T, IMAGE_REL_ARM_BRANCH24T, IMAGE_REL_ARM_BLX23T all
       // perform a 4 byte adjustment to the relocation.  Relative branches are
       // offset by 4 on ARM, however, because there is no RELA relocations, all
@@ -860,12 +894,12 @@ void VPEObjectWriter::createFileSymbols(MCAssembler &Asm) {
   for (const std::pair<std::string, size_t> &It : Asm.getFileNames()) {
     // round up to calculate the number of auxiliary symbols required
     const std::string &Name = It.first;
-    unsigned SymbolSize = UseBigObj ? COFF::Symbol32Size : COFF::Symbol16Size;
+    unsigned SymbolSize = UseBigObj ? VPE::Symbol32Size : VPE::Symbol16Size;
     unsigned Count = (Name.size() + SymbolSize - 1) / SymbolSize;
 
     VPESymbol *File = createSymbol(".file");
-    File->Data.SectionNumber = COFF::IMAGE_SYM_DEBUG;
-    File->Data.StorageClass = COFF::IMAGE_SYM_CLASS_FILE;
+    File->Data.SectionNumber = VPE::IMAGE_SYM_DEBUG;
+    File->Data.StorageClass = VPE::IMAGE_SYM_CLASS_FILE;
     File->Aux.resize(Count);
 
     unsigned Offset = 0;
@@ -905,13 +939,13 @@ void VPEObjectWriter::setWeakDefaultNames() {
       if (WeakDefaults.count(Sym.get()))
         continue;
       // Only consider external symbols
-      if (Sym->Data.StorageClass != COFF::IMAGE_SYM_CLASS_EXTERNAL)
+      if (Sym->Data.StorageClass != VPE::IMAGE_SYM_CLASS_EXTERNAL)
         continue;
       // Only consider symbols defined in a section or that are absolute
-      if (!Sym->Section && Sym->Data.SectionNumber != COFF::IMAGE_SYM_ABSOLUTE)
+      if (!Sym->Section && Sym->Data.SectionNumber != VPE::IMAGE_SYM_ABSOLUTE)
         continue;
       if (!AllowComdat && Sym->Section &&
-          Sym->Section->Header.Characteristics & COFF::IMAGE_SCN_LNK_COMDAT)
+          Sym->Section->Header.Characteristics & VPE::IMAGE_SCN_LNK_COMDAT)
         continue;
       Unique = Sym.get();
       break;
@@ -930,7 +964,7 @@ void VPEObjectWriter::setWeakDefaultNames() {
 
 static bool isAssociative(const VPESection &Section) {
   return Section.Symbol->Aux[0].Aux.SectionDefinition.Selection ==
-         COFF::IMAGE_COMDAT_SELECT_ASSOCIATIVE;
+         VPE::IMAGE_COMDAT_SELECT_ASSOCIATIVE;
 }
 
 void VPEObjectWriter::assignSectionNumbers() {
@@ -958,8 +992,8 @@ void VPEObjectWriter::assignFileOffsets(MCAssembler &Asm,
                                             const MCAsmLayout &Layout) {
   unsigned Offset = W.OS.tell();
 
-  Offset += UseBigObj ? COFF::Header32Size : COFF::Header16Size;
-  Offset += COFF::SectionSize * Header.NumberOfSections;
+  Offset += UseBigObj ? VPE::Header32Size : VPE::Header16Size;
+  Offset += VPE::SectionSize * Header.NumberOfSections;
 
   for (const auto &Section : Asm) {
     VPESection *Sec = SectionMap[&Section];
@@ -988,10 +1022,10 @@ void VPEObjectWriter::assignFileOffsets(MCAssembler &Asm,
 
       if (RelocationsOverflow) {
         // Reloc #0 will contain actual count, so make room for it.
-        Offset += COFF::RelocationSize;
+        Offset += VPE::RelocationSize;
       }
 
-      Offset += COFF::RelocationSize * Sec->Relocations.size();
+      Offset += VPE::RelocationSize * Sec->Relocations.size();
 
       for (auto &Relocation : Sec->Relocations) {
         assert(Relocation.Symb->getIndex() != -1);
@@ -1022,7 +1056,7 @@ uint64_t VPEObjectWriter::writeObject(MCAssembler &Asm,
     report_fatal_error(
         "PE COFF object files can't have more than 2147483647 sections");
 
-  UseBigObj = Sections.size() > COFF::MaxNumberOfSections16;
+  UseBigObj = Sections.size() > VPE::MaxNumberOfSections16;
   Header.NumberOfSections = Sections.size();
   Header.NumberOfSymbols = 0;
 
@@ -1042,10 +1076,10 @@ uint64_t VPEObjectWriter::writeObject(MCAssembler &Asm,
 
   // Build string table.
   for (const auto &S : Sections)
-    if (S->Name.size() > COFF::NameSize)
+    if (S->Name.size() > VPE::NameSize)
       Strings.add(S->Name);
   for (const auto &S : Symbols)
-    if (S->Name.size() > COFF::NameSize)
+    if (S->Name.size() > VPE::NameSize)
       Strings.add(S->Name);
   Strings.finalize();
 
@@ -1069,7 +1103,7 @@ uint64_t VPEObjectWriter::writeObject(MCAssembler &Asm,
   // Fixup associative COMDAT sections.
   for (auto &Section : Sections) {
     if (Section->Symbol->Aux[0].Aux.SectionDefinition.Selection !=
-        COFF::IMAGE_COMDAT_SELECT_ASSOCIATIVE)
+        VPE::IMAGE_COMDAT_SELECT_ASSOCIATIVE)
       continue;
 
     const MCSectionVPE &MCSec = *Section->MCSection;

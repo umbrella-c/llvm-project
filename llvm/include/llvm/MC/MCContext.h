@@ -49,6 +49,7 @@ class MCObjectFileInfo;
 class MCRegisterInfo;
 class MCSection;
 class MCSectionCOFF;
+class MCSectionVPE;
 class MCSectionDXContainer;
 class MCSectionELF;
 class MCSectionGOFF;
@@ -138,6 +139,7 @@ private:
   SpecificBumpPtrAllocator<MCSectionSPIRV> SPIRVAllocator;
   SpecificBumpPtrAllocator<MCSectionWasm> WasmAllocator;
   SpecificBumpPtrAllocator<MCSectionXCOFF> XCOFFAllocator;
+  SpecificBumpPtrAllocator<MCSectionVPE> VPEAllocator;
   SpecificBumpPtrAllocator<MCInst> MCInstAllocator;
 
   /// Bindings of names to symbols.
@@ -343,12 +345,35 @@ private:
     }
   };
 
+  struct VPESectionKey {
+    std::string SectionName;
+    StringRef GroupName;
+    int SelectionKey;
+    unsigned UniqueID;
+
+    VPESectionKey(StringRef SectionName, StringRef GroupName, int SelectionKey,
+                   unsigned UniqueID)
+        : SectionName(SectionName), GroupName(GroupName),
+          SelectionKey(SelectionKey), UniqueID(UniqueID) {}
+
+    bool operator<(const VPESectionKey &Other) const {
+      if (SectionName != Other.SectionName)
+        return SectionName < Other.SectionName;
+      if (GroupName != Other.GroupName)
+        return GroupName < Other.GroupName;
+      if (SelectionKey != Other.SelectionKey)
+        return SelectionKey < Other.SelectionKey;
+      return UniqueID < Other.UniqueID;
+    }
+  };
+
   StringMap<MCSectionMachO *> MachOUniquingMap;
   std::map<ELFSectionKey, MCSectionELF *> ELFUniquingMap;
   std::map<COFFSectionKey, MCSectionCOFF *> COFFUniquingMap;
   std::map<std::string, MCSectionGOFF *> GOFFUniquingMap;
   std::map<WasmSectionKey, MCSectionWasm *> WasmUniquingMap;
   std::map<XCOFFSectionKey, MCSectionXCOFF *> XCOFFUniquingMap;
+  std::map<VPESectionKey, MCSectionVPE *> VPEUniquingMap;
   StringMap<MCSectionDXContainer *> DXCUniquingMap;
   StringMap<bool> RelSecNames;
 
@@ -678,6 +703,24 @@ public:
       bool MultiSymbolsAllowed = false, const char *BeginSymName = nullptr,
       std::optional<XCOFF::DwarfSectionSubtypeFlags> DwarfSubtypeFlags =
           std::nullopt);
+
+  /// Gets or creates a section equivalent to Sec that is associated with the
+  /// section containing KeySym. For example, to create a debug info section
+  /// associated with an inline function, pass the normal debug info section
+  /// as Sec and the function symbol as KeySym.
+  MCSectionVPE *
+  getAssociativeVPESection(MCSectionVPE *Sec, const MCSymbol *KeySym,
+                            unsigned UniqueID = GenericSectionID);
+
+  MCSectionVPE *getVPESection(StringRef Section, unsigned Characteristics,
+                              SectionKind Kind, StringRef COMDATSymName,
+                              int Selection,
+                              unsigned UniqueID = GenericSectionID,
+                              const char *BeginSymName = nullptr);
+
+  MCSectionVPE *getVPESection(StringRef Section, unsigned Characteristics,
+                              SectionKind Kind,
+                              const char *BeginSymName = nullptr);
 
   // Create and save a copy of STI and return a reference to the copy.
   MCSubtargetInfo &getSubtargetCopy(const MCSubtargetInfo &STI);

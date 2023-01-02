@@ -324,9 +324,9 @@ public:
 
   bool isOSVali() const { return TargetTriple.isOSVali(); }
 
-  bool isTargetVali32() const { return !In64BitMode && isOSVali(); }
+  bool isTargetVali32() const { return !Is64Bit && isOSVali(); }
 
-  bool isTargetVali64() const { return In64BitMode && isOSVali(); }
+  bool isTargetVali64() const { return Is64Bit && isOSVali(); }
 
   bool isPICStyleGOT() const { return PICStyle == PICStyles::Style::GOT; }
   bool isPICStyleRIPRel() const { return PICStyle == PICStyles::Style::RIPRel; }

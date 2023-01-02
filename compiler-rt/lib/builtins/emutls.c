@@ -156,7 +156,7 @@ static void emutls_key_destructor(void* ptr) {
 }
 
 static __inline void emutls_init(void) {
-    if (tss_create(&emutls_pthread_key, emutls_key_destructor) != OsSuccess) {
+    if (tss_create(&emutls_pthread_key, emutls_key_destructor) != OS_EOK) {
         abort();
     }
 }

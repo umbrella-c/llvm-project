@@ -22,6 +22,7 @@
 #include <windows.h>
 #elif defined(MOLLENOS)
 #include <os/mollenos.h>
+#include <os/memory.h>
 #else
 #ifndef __APPLE__
 #include <unistd.h>
@@ -50,9 +51,9 @@ COMPILER_RT_ABI void __enable_execute_stack(void *addr) {
                  &mbi.Protect);
 #elif defined(MOLLENOS)
   unsigned int previousValue = 0;
-  if (MemoryProtect(addr, 0x1000, MEMORY_READ | MEMORY_WRITE | MEMORY_EXECUTABLE, &previousValue) != OsSuccess) {
-      // assert?
-  }
+  (void)MemoryProtect(addr, 0x1000, 
+    MEMORY_READ | MEMORY_WRITE | MEMORY_EXECUTABLE, 
+    &previousValue);
 #else
 #if __APPLE__
   // On Darwin, pagesize is always 4096 bytes

@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 
-using namespace llvm::COFF;
+using namespace llvm::VPE;
 using namespace llvm::object;
 using namespace llvm;
 

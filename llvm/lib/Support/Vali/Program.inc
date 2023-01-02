@@ -14,6 +14,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Errc.h"
+#include "llvm/Support/Errno.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -21,7 +22,8 @@
 #include <io.h>
 #include <malloc.h>
 #include <os/mollenos.h>
-#include <os/process.h>
+#include <os/services/process.h>
+#include <signal.h>
 
 namespace llvm {
 
@@ -37,12 +39,12 @@ ErrorOr<std::string> sys::findProgramByName(StringRef Name,
 
   SmallVector<StringRef, 12> PathExts;
   PathExts.push_back("");
-  PathExts.push_back(".app");
+  PathExts.push_back(".run");
 
   SmallVector<StringRef, 16> EnvironmentPaths;
   if (Paths.empty())
     if (const char *PathEnv = std::getenv("PATH")) {
-      SplitString(PathEnv, EnvironmentPaths, ":");
+      SplitString(PathEnv, EnvironmentPaths, ";");
       Paths = EnvironmentPaths;
     }
   
@@ -134,53 +136,92 @@ static bool Execute(ProcessInfo &PI, StringRef Program,
     return false;
   }
 
-  // can_execute may succeed by looking at Program + ".app". 
+  // can_execute may succeed by looking at Program + ".run". 
   SmallString<64> ProgramStorage;
   if (!sys::fs::exists(Program))
-    Program = Twine(Program + ".app").toStringRef(ProgramStorage);
+    Program = Twine(Program + ".run").toStringRef(ProgramStorage);
 
   // Vali wants a command line, not an array of args, to pass to the new
   // process.  We have to concatenate them all, while quoting the args that
   // have embedded spaces (or are empty).
   ErrorOr<std::string> Command = flattenArgs(Args);
-  OsStatus_t status = ProcessSpawn(Program.begin(), Command->c_str(), &PI.Pid);
-  if (status != OsSuccess) {
+  oserr_t status = OSProcessSpawn(Program.begin(), Command->c_str(), &PI.Pid);
+  if (status != OS_EOK) {
       return false;
   }
   return true;
 }
 
+/// This function builds an error message into \p ErrMsg using the \p prefix
+/// string and the Unix error number given by \p errnum. If errnum is -1, the
+/// default then the value of errno is used.
+/// Make an error message
+///
+/// If the error number can be converted to a string, it will be
+/// separated from prefix by ": ".
+static inline bool MakeErrMsg(
+  std::string* ErrMsg, const std::string& prefix, int errnum = -1) {
+  if (!ErrMsg)
+    return true;
+  if (errnum == -1)
+    errnum = errno;
+  *ErrMsg = prefix + ": " + llvm::sys::StrError(errnum);
+  return true;
+}
+
 // Implemented
 namespace llvm {
-ProcessInfo sys::Wait(const ProcessInfo &PI, unsigned SecondsToWait,
-                      bool WaitUntilChildTerminates, std::string *ErrMsg,
-                      Optional<ProcessStatistics> *ProcStat) {
+ProcessInfo sys::Wait(const ProcessInfo &PI,
+                      std::optional<unsigned> SecondsToWait,
+                      std::string *ErrMsg,
+                      std::optional<ProcessStatistics> *ProcStat,
+                      bool Polling) {
   assert(PI.Pid && "invalid pid to wait on, process not started?");
   assert(PI.Pid != UUID_INVALID &&
          "invalid process handle to wait on, process not started?");
-  size_t milliSecondsToWait = 0;
+  size_t      milliSecondsToWait = SecondsToWait ? *SecondsToWait * 1000 : 0;
+  oserr_t     oserr;
   ProcessInfo WaitResult = PI;
-  if (!WaitUntilChildTerminates && SecondsToWait > 0)
-    milliSecondsToWait = SecondsToWait * 1000;
-
+  
   if (ProcStat)
     ProcStat->reset();
 
-  // Wait for process
-  if (ProcessJoin(PI.Pid, milliSecondsToWait, &WaitResult.ReturnCode) != OsSuccess) {
-      // Timeout occurred
-      if (SecondsToWait) {
-          // Kill it
-          if (ProcessKill(PI.Pid) != OsSuccess) {
-              if (ErrMsg) {
-                  *ErrMsg = "Failed to kill the process after wait timeout.";
-              }
-          }
-          return WaitResult;
+  oserr = OSProcessJoin(PI.Pid, milliSecondsToWait, &WaitResult.ReturnCode);
+  if (oserr == OS_ETIMEOUT) {
+    if (!Polling && *SecondsToWait > 0) {
+      oserr = OSProcessSignal(PI.Pid, SIGKILL);
+      if (oserr != OS_EOK) {
+        if (ErrMsg)
+          MakeErrMsg(ErrMsg, "Failed to terminate timed-out program");
+
+        // -2 indicates a crash or timeout as opposed to failure to execute.
+        WaitResult.ReturnCode = -2;
+        return WaitResult;
       }
-      else {
-          return ProcessInfo();
-      }
+      (void)OSProcessJoin(PI.Pid, 0, &WaitResult.ReturnCode);
+    } else {
+      // Non-blocking wait.
+      return ProcessInfo();
+    }
+  }
+
+  // Get process execution statistics.
+  if (ProcStat) {
+    /** 
+     * TODO: Implement these statistics
+    FILETIME CreationTime, ExitTime, KernelTime, UserTime;
+    PROCESS_MEMORY_COUNTERS MemInfo;
+    if (GetProcessTimes(PI.Process, &CreationTime, &ExitTime, &KernelTime,
+                        &UserTime) &&
+        GetProcessMemoryInfo(PI.Process, &MemInfo, sizeof(MemInfo))) {
+      auto UserT = std::chrono::duration_cast<std::chrono::microseconds>(
+          toDuration(UserTime));
+      auto KernelT = std::chrono::duration_cast<std::chrono::microseconds>(
+          toDuration(KernelTime));
+      uint64_t PeakMemory = MemInfo.PeakPagefileUsage / 1024;
+      *ProcStat = ProcessStatistics{UserT + KernelT, UserT, PeakMemory};
+    }
+    */
   }
   return WaitResult;
 }

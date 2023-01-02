@@ -18,7 +18,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 
-#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(MOLLENOS)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(__VALI__)
 #include <unistd.h>
 #else
 #include <io.h>

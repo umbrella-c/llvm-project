@@ -21,9 +21,8 @@
 #include "llvm/Object/Error.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/raw_ostream.h"
 
-using namespace llvm::COFF;
+using namespace llvm::VPE;
 using namespace llvm;
 
 namespace llvm {
@@ -76,11 +75,6 @@ static bool isDecorated(StringRef Sym) {
   // themselves can start with an underscore, while a second one still needs
   // to be added.
   return Sym.startswith("@") || Sym.contains("@@") || Sym.startswith("?");
-}
-
-static Error createError(const Twine &Err) {
-  return make_error<StringError>(StringRef(Err.str()),
-                                 object_error::parse_failed);
 }
 
 class Lexer {

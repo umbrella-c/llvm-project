@@ -14,7 +14,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <os/mollenos.h>
-#include <os/process.h>
+#include <os/services/process.h>
 #include <malloc.h>
 #include <time.h>
 #include <stdlib.h>
@@ -27,19 +27,28 @@ using namespace llvm;
 Process::Pid Process::getProcessId() {
   static_assert(sizeof(Pid) >= sizeof(uint32_t),
                 "Process::Pid should be big enough to store DWORD");
-  return Pid(::ProcessGetCurrentId());
+  return Pid(::OSProcessCurrentID());
 }
 
 // This function retrieves the page size using GetNativeSystemInfo() and is
 // present solely so it can be called once to initialize the self_process member
 // below.
 static unsigned computePageSize() {
-  SystemDescriptor_t Descriptor;
-    if (SystemQuery(&Descriptor) != OsSuccess) {
-        // Default to 0x1000
-        return 0x1000;
-    }
-    return Descriptor.PageSizeBytes;
+  OSSystemMemoryInfo_t memInfo;
+  oserr_t              oserr;
+  size_t               bytesQueried;
+
+  oserr = OSSystemQuery(
+          OSSYSTEMQUERY_MEMINFO,
+          &memInfo,
+          sizeof(OSSystemMemoryInfo_t),
+          &bytesQueried
+  );
+  if (oserr != OS_EOK) {
+      // Default to 0x1000
+      return 0x1000;
+  }
+  return memInfo.PageSizeBytes;
 }
 
 Expected<unsigned> Process::getPageSize() {
@@ -76,7 +85,7 @@ Optional<std::string> Process::GetEnv(StringRef Name) {
   std::string NameStr = Name.str();
   const char *Val = ::getenv(NameStr.c_str());
   if (!Val)
-    return None;
+    return std::nullopt;
   return std::string(Val);
 }
 
@@ -176,14 +185,10 @@ const char *Process::ResetColor() {
 
 unsigned Process::GetRandomNumber() {
   const auto Now = std::chrono::high_resolution_clock::now();
-  auto Seed = hash_combine(Now.time_since_epoch().count(), ::ProcessGetCurrentId());
+  auto Seed = hash_combine(Now.time_since_epoch().count(), ::OSProcessCurrentID());
   static int x = (static_cast<void>(::srand(Seed)), 0);
   (void)x;
   return ::rand();
 }
 
-LLVM_ATTRIBUTE_NORETURN
-void Process::ExitNoCleanup(int RetCode) {
-  _Exit(RetCode);
-  llvm_unreachable("_Exit doesn't return");
-}
+[[noreturn]] void Process::ExitNoCleanup(int RetCode) { _Exit(RetCode); }

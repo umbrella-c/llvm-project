@@ -13,6 +13,10 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include <os/mollenos.h>
+#include <os/services/file.h>
+#include <os/services/process.h>
+#include <os/services/path.h>
+#include <sys/mman.h>
 #include <threads.h>
 #include <errno.h>
 #include <stdio.h>
@@ -26,14 +30,15 @@ namespace fs {
 
 const file_t kInvalidFile = -1;
 
-// Implemented
-std::string getMainExecutable(const char *argv0, void *MainAddr) {
+/// GetMainExecutable - Return the path to the main executable, given the
+/// value of argv[0] from program startup.
+std::string getMainExecutableImpl(const char *argv0, void *MainAddr) {
   return std::string(argv0);
 }
 
 // Implemented
 UniqueID file_status::getUniqueID() const {
-  LargeUInteger FileID;
+  UInteger64_t FileID;
   FileID.u.LowPart = FileIndexLow;
   FileID.u.HighPart = FileIndexHigh;
   return UniqueID((uint64_t)VolumeSerialNumber, FileID.QuadPart);
@@ -41,7 +46,7 @@ UniqueID file_status::getUniqueID() const {
 
 // Implemented
 TimePoint<> basic_file_status::getLastAccessedTime() const {
-  LargeUInteger Time;
+  UInteger64_t Time;
   Time.u.LowPart = LastAccessedTimeLow;
   Time.u.HighPart = LastAccessedTimeHigh;
   return toTimePoint(Time.QuadPart);
@@ -49,7 +54,7 @@ TimePoint<> basic_file_status::getLastAccessedTime() const {
 
 // Implemented
 TimePoint<> basic_file_status::getLastModificationTime() const {
-  LargeUInteger Time;
+  UInteger64_t Time;
   Time.u.LowPart = LastWriteTimeLow;
   Time.u.HighPart = LastWriteTimeHigh;
   return toTimePoint(Time.QuadPart);
@@ -66,8 +71,8 @@ file_t getStderrHandle() { return STDERR_FILENO; }
 
 // Implemented
 ErrorOr<space_info> disk_space(const Twine &Path) {
-  OsFileSystemDescriptor_t Descriptor;
-  if (!::GetFileSystemInformationFromPath(Path.str().c_str(), &Descriptor))
+  OSFileSystemDescriptor_t Descriptor;
+  if (!::GetFileSystemInformationFromPath(Path.str().c_str(), 1, &Descriptor))
     return make_error_code(errc::no_such_file_or_directory);
   space_info SpaceInfo;
   uint64_t SegmentSizeInBytes = Descriptor.BlockSize * Descriptor.BlocksPerSegment;
@@ -77,45 +82,35 @@ ErrorOr<space_info> disk_space(const Twine &Path) {
   return SpaceInfo;
 }
 
-// Implemented
 std::error_code current_path(SmallVectorImpl<char> &result) {
-  SmallVector<char, _MAXPATH> cur_path;
-  if (GetWorkingDirectory(cur_path.data(), _MAXPATH) != OsSuccess) {
+  result.clear();
+  result.resize_for_overwrite(_MAXPATH);
+
+  if (OSProcessWorkingDirectory(UUID_INVALID, result.data(), result.size()) != OS_EOK) {
       return make_error_code(errc::invalid_argument);
   }
-  cur_path.set_size(strlen(cur_path.data()) + 1);
-  result.clear();
-  result.append(cur_path.begin(), cur_path.end());
   return std::error_code();
 }
 
-// Implemented
 std::error_code set_current_path(const Twine &path) {
-  SmallString<_MAXPATH> path_storage;
+  SmallString<128> path_storage;
   StringRef f = path.toNullTerminatedStringRef(path_storage);
-  if (SetWorkingDirectory(f.begin()) != OsSuccess) {
+  if (OSProcessSetWorkingDirectory(f.begin()) != OS_EOK) {
       return make_error_code(errc::no_such_file_or_directory);
   }
   return std::error_code();
 }
 
-// Implemented
 std::error_code create_directory(const Twine &path, bool IgnoreExisting,
                                  perms Perms) {
-  SmallString<_MAXPATH> path_storage;
-  struct DIR *dhandle = NULL;
-  StringRef f = path.toNullTerminatedStringRef(path_storage);
-  int ec = ::opendir(f.begin(), O_CREAT | O_EXCL, &dhandle);
-  if (ec == -1) {
-      if (errno == EACCES) {
-          return make_error_code(errc::permission_denied);
-      }
-      if (errno == EEXIST) {
-          return IgnoreExisting ? std::error_code() : make_error_code(errc::file_exists);
-      }
+  SmallString<128> path_storage;
+  StringRef p = path.toNullTerminatedStringRef(path_storage);
+
+  if (::mkdir(p.begin(), Perms) == -1) {
+    if (errno != EEXIST || !IgnoreExisting)
       return std::error_code(errno, std::generic_category());
   }
-  ::closedir(dhandle);
+
   return std::error_code();
 }
 
@@ -162,10 +157,10 @@ std::error_code remove(const Twine &path, bool IgnoreNonExisting) {
 std::error_code is_local(const Twine &path, bool &result) {
   if (!llvm::sys::fs::exists(path) || !llvm::sys::path::has_root_path(path))
     return make_error_code(errc::no_such_file_or_directory);
-  OsStorageDescriptor_t Descriptor;
+  OSStorageDescriptor_t Descriptor;
   SmallString<_MAXPATH> path_storage;
   StringRef f = path.toNullTerminatedStringRef(path_storage);
-  if (GetStorageInformationFromPath(f.begin(), &Descriptor) != OsSuccess) {
+  if (GetStorageInformationFromPath(f.begin(), 1, &Descriptor) != OS_EOK) {
     return make_error_code(errc::no_such_file_or_directory);
   }
   if (Descriptor.Flags & STORAGE_STATIC) {
@@ -178,8 +173,8 @@ std::error_code is_local(const Twine &path, bool &result) {
 
 // Implemented
 std::error_code is_local(int FD, bool &Result) {
-  OsStorageDescriptor_t Descriptor;
-  if (GetStorageInformationFromFd(FD, &Descriptor) != OsSuccess) {
+  OSStorageDescriptor_t Descriptor;
+  if (GetStorageInformationFromFd(FD, &Descriptor) != OS_EOK) {
     return make_error_code(errc::no_such_file_or_directory);
   }
   if (Descriptor.Flags & STORAGE_STATIC) {
@@ -210,10 +205,10 @@ std::error_code resize_file(int FD, uint64_t Size) {
 
 // Implemented
 std::error_code access(const Twine &Path, AccessMode Mode) {
-    OsFileDescriptor_t Descriptor;
+    OSFileDescriptor_t Descriptor;
     SmallString<256> path_storage;
     StringRef f = Path.toNullTerminatedStringRef(path_storage);
-    if (GetFileInformationFromPath(f.begin(), &Descriptor) != OsSuccess) {
+    if (GetFileInformationFromPath(f.begin(), 1, &Descriptor) != OS_EOK) {
         return errc::no_such_file_or_directory;
     }
     if (Mode == AccessMode::Write && !(Descriptor.Permissions & FILE_PERMISSION_WRITE)) {
@@ -275,16 +270,16 @@ static perms perms_from_flags(unsigned int Permissions) {
 
 // Implemented
 std::error_code status(const Twine &path, file_status &result, bool Follow) {
-    OsFileDescriptor_t Descriptor;
+    OSFileDescriptor_t Descriptor;
     SmallString<256> path_storage;
     StringRef f = path.toNullTerminatedStringRef(path_storage);
-    if (GetFileInformationFromPath(f.begin(), &Descriptor) != OsSuccess) {
+    if (GetFileInformationFromPath(f.begin(), (int)Follow, &Descriptor) != OS_EOK) {
         return errc::no_such_file_or_directory;
     }
 
-    LargeUInteger Accessed, Modified, FileID;
-    Accessed.QuadPart = Descriptor.AccessedAt.tv_sec;
-    Modified.QuadPart = Descriptor.ModifiedAt.tv_sec;
+    UInteger64_t Accessed, Modified, FileID;
+    Accessed.QuadPart = Descriptor.AccessedAt.Seconds;
+    Modified.QuadPart = Descriptor.ModifiedAt.Seconds;
     FileID.QuadPart   = Descriptor.Id;
     result = file_status(
         file_type_from_flags(Descriptor.Flags), 
@@ -301,14 +296,14 @@ std::error_code status(const Twine &path, file_status &result, bool Follow) {
 
 // Implemented
 std::error_code status(int FD, file_status &Result) {
-    OsFileDescriptor_t Descriptor;
-    if (GetFileInformationFromFd(FD, &Descriptor) != OsSuccess) {
+    OSFileDescriptor_t Descriptor;
+    if (GetFileInformationFromFd(FD, &Descriptor) != OS_EOK) {
         return errc::no_such_file_or_directory;
     }
     
-    LargeUInteger Accessed, Modified, FileID;
-    Accessed.QuadPart = Descriptor.AccessedAt.tv_sec;
-    Modified.QuadPart = Descriptor.ModifiedAt.tv_sec;
+    UInteger64_t Accessed, Modified, FileID;
+    Accessed.QuadPart = Descriptor.AccessedAt.Seconds;
+    Modified.QuadPart = Descriptor.ModifiedAt.Seconds;
     FileID.QuadPart   = Descriptor.Id;
     Result = file_status(
         file_type_from_flags(Descriptor.Flags), perms_from_flags(Descriptor.Permissions), 
@@ -327,30 +322,20 @@ unsigned getUmask() {
 }
 
 std::error_code setPermissions(const Twine &Path, perms Permissions) {
-  OsStatus_t       Status;
-  int              Access = FILE_PERMISSION_READ;
+  oserr_t          Status;
   SmallString<128> PathStorage;
   StringRef        P = Path.toNullTerminatedStringRef(PathStorage);
 
-  if (Permissions & 0222)
-    Access |= FILE_PERMISSION_WRITE;
-
-  Status = ChangeFilePermissionsFromPath(P.begin(), Access);
-  if (OsStatusToErrno(Status)) {
+  Status = ChangeFilePermissionsFromPath(P.begin(), Permissions);
+  if (OsErrToErrNo(Status)) {
     return std::error_code(errno, std::generic_category());
   }
   return std::error_code();
 }
 
 std::error_code setPermissions(int FD, perms Permissions) {
-  OsStatus_t Status;
-  int        Access = FILE_PERMISSION_READ;
-
-  if (Permissions & 0222)
-    Access |= FILE_PERMISSION_WRITE;
-
-  Status = ChangeFilePermissionsFromFd(FD, Access);
-  if (OsStatusToErrno(Status)) {
+  oserr_t Status = ChangeFilePermissionsFromFd(FD, Permissions);
+  if (OsErrToErrNo(Status)) {
     return std::error_code(errno, std::generic_category());
   }
   return std::error_code();
@@ -364,12 +349,18 @@ std::error_code setLastAccessAndModificationTime(int FD, TimePoint<> AccessTime,
   //return std::error_code();
   return make_error_code(errc::function_not_supported);
 }
+
 // Implemented
 std::error_code mapped_file_region::init(int FD, uint64_t Offset, mapmode Mode) {
-  int Flags = (Mode == readonly) ? FILE_MAPPING_READ : (FILE_MAPPING_READ | FILE_MAPPING_WRITE);
-  this->Mode = Mode;
   assert(Size != 0);
-  if (::CreateFileMapping(FD, Flags, Offset, Size, &Mapping) != OsSuccess)
+
+  int flags = (Mode == readwrite) ? MAP_SHARED : MAP_PRIVATE;
+  int prot = (Mode == readonly) ? PROT_READ : (PROT_READ | PROT_WRITE);
+#if defined(MAP_NORESERVE)
+  flags |= MAP_NORESERVE;
+#endif
+  Mapping = ::mmap(nullptr, Size, prot, flags, FD, Offset);
+  if (Mapping == nullptr)
     return std::error_code(errno, std::generic_category());
   return std::error_code();
 }
@@ -377,38 +368,52 @@ std::error_code mapped_file_region::init(int FD, uint64_t Offset, mapmode Mode) 
 // Implemented
 mapped_file_region::mapped_file_region(int fd, mapmode mode, size_t length,
                                        uint64_t offset, std::error_code &ec)
-    : Size(length), Mapping() {
+    : Size(length), Mode(mode) {
+  (void)Mode;
   ec = init(fd, offset, mode);
   if (ec)
-    Mapping = nullptr;
+    copyFrom(mapped_file_region());
 }
 
 // Implemented
 void mapped_file_region::unmapImpl() {
   if (Mapping)
-    ::DestroyFileMapping(Mapping);
+    ::munmap(Mapping, Size);
+}
+
+void mapped_file_region::dontNeedImpl() {
+  assert(Mode == mapped_file_region::readonly);
+  if (!Mapping)
+    return;
+  // we have no support for madvise, so no-op this
 }
 
 // Implemented
 int mapped_file_region::alignment() {
-  SystemDescriptor_t Descriptor;
-  if (SystemQuery(&Descriptor) != OsSuccess) {
-      // Default to 0x1000
-      return 0x1000;
-  }
-  return Descriptor.PageSizeBytes;
+    OSSystemMemoryInfo_t memInfo;
+    oserr_t              oserr;
+    size_t               bytesQueried;
+
+    oserr = OSSystemQuery(
+            OSSYSTEMQUERY_MEMINFO,
+            &memInfo,
+            sizeof(OSSystemMemoryInfo_t),
+            &bytesQueried
+    );
+    if (oserr != OS_EOK) {
+        // Default to 0x1000
+        return 0x1000;
+    }
+    return memInfo.PageSizeBytes;
 }
 
-// Implemented
 std::error_code detail::directory_iterator_construct(detail::DirIterState &it,
                                                      StringRef path,
                                                      bool follow_symlinks) {
   SmallString<128> path_null(path);
-  struct DIR *directory = nullptr; 
-  int ec = ::opendir(path_null.c_str(), O_RDONLY, &directory);
-  if (!directory || ec) {
-      return std::error_code(ec, std::generic_category());
-  }
+  DIR *directory = ::opendir(path_null.c_str());
+  if (!directory)
+    return std::error_code(errno, std::generic_category());
 
   it.IterationHandle = reinterpret_cast<intptr_t>(directory);
   // Add something for replace_filename to replace.
@@ -417,47 +422,61 @@ std::error_code detail::directory_iterator_construct(detail::DirIterState &it,
   return directory_iterator_increment(it);
 }
 
-// Implemented
 std::error_code detail::directory_iterator_destruct(detail::DirIterState &it) {
   if (it.IterationHandle)
-    ::closedir(reinterpret_cast<struct DIR*>(it.IterationHandle));
+    ::closedir(reinterpret_cast<DIR *>(it.IterationHandle));
   it.IterationHandle = 0;
   it.CurrentEntry = directory_entry();
   return std::error_code();
 }
 
-static file_type direntType(struct DIRENT* Entry) {
-  if (Entry->d_options & FILE_FLAG_DIRECTORY) {
-      return file_type::directory_file;
+static file_type direntType(dirent* Entry) {
+  switch (Entry->d_type) {
+  case DT_BLK:
+    return file_type::block_file;
+  case DT_CHR:
+    return file_type::character_file;
+  case DT_DIR:
+    return file_type::directory_file;
+  case DT_FIFO:
+    return file_type::fifo_file;
+  case DT_LNK:
+    return file_type::symlink_file;
+  case DT_REG:
+    return file_type::regular_file;
+  case DT_SOCK:
+    return file_type::socket_file;
+  // Unlike in lstat, hitting "unknown" here simply means that the underlying
+  // filesystem doesn't support d_type. Report is as 'none' so we correctly
+  // set the cache to empty.
+  case DT_UNKNOWN:
+    break;
   }
-  else if (Entry->d_options & FILE_FLAG_LINK) {
-      return file_type::symlink_file;
-  }
-  return file_type::regular_file;
+  return file_type::type_unknown;
 }
 
-// Implemented
-std::error_code detail::directory_iterator_increment(detail::DirIterState &it) {
-  struct DIRENT dentry;
+std::error_code detail::directory_iterator_increment(detail::DirIterState &It) {
   errno = 0;
-  int ec = ::readdir(reinterpret_cast<struct DIR*>(it.IterationHandle), &dentry);
-  if (ec != EOK && ec != EOF) {
-    return std::error_code(ec, std::generic_category());
-  } else if (ec != EOF) {
-    StringRef name(&dentry.d_name[0], strlen(&dentry.d_name[0]));
-    if ((name.size() == 1 && name[0] == '.') ||
-        (name.size() == 2 && name[0] == '.' && name[1] == '.'))
-      return directory_iterator_increment(it);
-    it.CurrentEntry.replace_filename(name, direntType(&dentry));
+  dirent *CurDir = ::readdir(reinterpret_cast<DIR *>(It.IterationHandle));
+  if (CurDir == nullptr && errno != 0) {
+    return std::error_code(errno, std::generic_category());
+  } else if (CurDir != nullptr) {
+    StringRef Name(CurDir->d_name);
+    if ((Name.size() == 1 && Name[0] == '.') ||
+        (Name.size() == 2 && Name[0] == '.' && Name[1] == '.'))
+      return directory_iterator_increment(It);
+    It.CurrentEntry.replace_filename(Name, direntType(CurDir));
   } else
-    return directory_iterator_destruct(it);
+    return directory_iterator_destruct(It);
 
   return std::error_code();
 }
 
-// Implemented
 ErrorOr<basic_file_status> directory_entry::status() const {
-  return Status;
+  file_status s;
+  if (auto EC = fs::status(Path, s, FollowSymlinks))
+    return EC;
+  return s;
 }
 
 static int nativeOpenFlags(CreationDisposition Disp, OpenFlags Flags,
@@ -542,31 +561,19 @@ Expected<size_t> readNativeFileSlice(file_t FD, MutableArrayRef<char> Buf,
   return readNativeFile(FD, Buf);
 }
 
+// TODO: no native lock support
 std::error_code tryLockFile(int FD, std::chrono::milliseconds Timeout) {
-  auto Start = std::chrono::steady_clock::now();
-  auto End = Start + Timeout;
-  do {
-    if (!::iolock(FD))
-      return std::error_code();
-    int Error = errno;
-    if (Error != EACCES && Error != EAGAIN)
-      return std::error_code(Error, std::generic_category());
-    thrd_sleepex(1);
-  } while (std::chrono::steady_clock::now() < End);
-  return make_error_code(errc::no_lock_available);
+  return std::error_code();
 }
 
+// TODO: no native lock support
 std::error_code lockFile(int FD) {
-  if (!::iolock(FD))
-    return std::error_code();
-  int Error = errno;
-  return std::error_code(Error, std::generic_category());
+  return std::error_code();
 }
 
+// TODO: no native lock support
 std::error_code unlockFile(int FD) {
-  if (!::iounlock(FD))
-    return std::error_code();
-  return std::error_code(errno, std::generic_category());
+  return std::error_code();
 }
 
 std::error_code closeFile(file_t &F) {
@@ -579,48 +586,23 @@ std::error_code closeFile(file_t &F) {
 std::error_code openFileForRead(const Twine &Name, int &ResultFD,
                                 OpenFlags Flags,
                                 SmallVectorImpl<char> *RealPath) {
-    SmallString<256> name_storage;
-    StringRef f = Name.toNullTerminatedStringRef(name_storage);
-    // @todo handle openflags
+  std::error_code EC =
+      openFile(Name, ResultFD, CD_OpenExisting, FA_Read, Flags, 0666);
+  if (EC)
+    return EC;
 
-    int fd = open(f.begin(), O_RDONLY);
-    if (fd == -1) {
-        return std::error_code(errno, std::generic_category());
-    }
-    ResultFD = fd;
-    if (RealPath) {
-        RealPath->clear();
-        RealPath->reserve(_MAXPATH);
-        if (GetFilePathFromFd(fd, (char*)RealPath->begin(), _MAXPATH) != OsSuccess) {
-            return std::error_code(errno, std::generic_category());
-        }
-        RealPath->set_size(strlen(RealPath->begin()) + 1);
-    }
+  // Attempt to get the real name of the file, if the user asked
+  if (!RealPath)
     return std::error_code();
-}
+  RealPath->clear();
 
-// Implemented
-std::error_code openFileForWrite(const Twine &Name, int &ResultFD,
-                            sys::fs::OpenFlags Flags, unsigned Mode) {
-  // Verify that we don't have both "append" and "excl". @todo
-  SmallString<256> name_storage;
-  StringRef f = Name.toNullTerminatedStringRef(name_storage);
-  int oflags = O_RDWR;
+  SmallString<128> Storage;
+  StringRef P = Name.toNullTerminatedStringRef(Storage);
 
-  // Resolve Mode flags @todo
-
-  // Resolve creation flags
-  if (Flags & OF_Append) { oflags |= O_APPEND; }
-  else                   { oflags |= O_CREAT;  }
-  if (Flags & OF_Delete) { oflags |= O_TEMPORARY; }
-  if (Flags & OF_Text)   { oflags |= O_TEXT; }
-
-  // open
-  int fd = open(f.begin(), oflags);
-  if (fd == -1) {
-      return std::error_code(errno, std::generic_category());
-  }
-  ResultFD = fd;
+  // Use ::realpath to get the real path name
+  char Buffer[_MAXPATH];
+  if (::OSGetFullPath(P.begin(), 1, Buffer, _MAXPATH) == OS_EOK)
+    RealPath->append(Buffer, Buffer + strlen(Buffer));
   return std::error_code();
 }
 
@@ -691,7 +673,15 @@ static void expandTildeExpr(SmallVectorImpl<char> &Path) {
   Path.insert(Path.begin() + 1, HomeDir.begin() + 1, HomeDir.end());
 }
 
-// Implemented
+void expand_tilde(const Twine &path, SmallVectorImpl<char> &dest) {
+  dest.clear();
+  if (path.isTriviallyEmpty())
+    return;
+
+  path.toVector(dest);
+  expandTildeExpr(dest);
+}
+
 std::error_code real_path(const Twine &path, SmallVectorImpl<char> &dest,
                           bool expand_tilde) {
   dest.clear();
@@ -705,25 +695,12 @@ std::error_code real_path(const Twine &path, SmallVectorImpl<char> &dest,
     return real_path(Storage, dest, false);
   }
 
-  if (is_directory(path)) {
-    SmallString<256> path_storage;
-    struct DIR *dhandle = NULL;
-    StringRef f = path.toNullTerminatedStringRef(path_storage);
-    dest.reserve(_MAXPATH);
-    if (::opendir(f.begin(), O_RDONLY, &dhandle) == -1) {
-        return std::error_code(errno, std::generic_category());
-    }
-    //@todo
-    //GetFilePathFromHandle(dhandle->d_handle, (const char*)dest.begin(), _MAXPATH);
-    dest.set_size(strlen((const char*)dest.begin()) + 1);
-    ::closedir(dhandle);
-    return std::error_code();
-  }
-
-  int fd;
-  if (std::error_code EC = llvm::sys::fs::openFileForRead(path, fd, OF_None, &dest))
-    return EC;
-  ::close(fd);
+  SmallString<128> Storage;
+  StringRef P = path.toNullTerminatedStringRef(Storage);
+  char Buffer[_MAXPATH];
+  if (::OSGetFullPath(P.begin(), 1, Buffer, _MAXPATH) != OS_EOK)
+    return std::error_code(errno, std::generic_category());
+  dest.append(Buffer, Buffer + strlen(Buffer));
   return std::error_code();
 }
 
@@ -732,41 +709,49 @@ std::error_code real_path(const Twine &path, SmallVectorImpl<char> &dest,
 
 // Implemented
 namespace path {
-bool getUserCacheDir(SmallVectorImpl<char> &Result) {
-    SmallVector<char, _MAXPATH> Buf;
-    if (GetUserCacheDirectory(Buf.data(), Buf.capacity()) != OsSuccess) {
-        return false;
-    }
-    Buf.set_size(strlen(Buf.data()) + 1);
-    Result.append(Buf.begin(), Buf.end());
-    return true;
+bool home_directory(SmallVectorImpl<char> &result) {
+  SmallVector<char, _MAXPATH> Buf;
+  if (OSGetUserDirectory(Buf.data(), Buf.capacity()) != OS_EOK) {
+      return false;
+  }
+  result.clear();
+  result.append(Buf.begin(), Buf.end());
+  return true;
 }
 
-bool home_directory(SmallVectorImpl<char> &result) {
-    SmallVector<char, _MAXPATH> Buf;
-    if (GetUserDirectory(Buf.data(), Buf.capacity()) != OsSuccess) {
-        return false;
-    }
-    Buf.set_size(strlen(Buf.data()) + 1);
-    result.append(Buf.begin(), Buf.end());
-    return true;
+bool user_config_directory(SmallVectorImpl<char> &result) {
+  // Fallback: ~/.config
+  if (!home_directory(result)) {
+    return false;
+  }
+  append(result, ".config");
+  return true;
+}
+
+bool cache_directory(SmallVectorImpl<char> &result) {
+  SmallVector<char, _MAXPATH> Buf;
+  if (OSGetUserCacheDirectory(Buf.data(), Buf.capacity()) != OS_EOK) {
+      return false;
+  }
+  result.clear();
+  result.append(Buf.begin(), Buf.end());
+  return true;
 }
 
 void system_temp_directory(bool ErasedOnReboot, SmallVectorImpl<char> &Result) {
-    SmallVector<char, _MAXPATH> Buf;
-    Result.clear();
-    if (ErasedOnReboot) {
-        if (GetApplicationTemporaryDirectory(Buf.data(), Buf.capacity()) != OsSuccess) {
-            return;
-        }
-    }
-    else {
-        if (GetApplicationDirectory(Buf.data(), Buf.capacity()) != OsSuccess) {
-            return;
-        }
-    }
-    Buf.set_size(strlen(Buf.data()) + 1);
-    Result.append(Buf.begin(), Buf.end());
+  SmallVector<char, _MAXPATH> Buf;
+  if (ErasedOnReboot) {
+      if (OSGetApplicationTemporaryDirectory(Buf.data(), Buf.capacity()) != OS_EOK) {
+          return;
+      }
+  }
+  else {
+      if (OSGetApplicationDirectory(Buf.data(), Buf.capacity()) != OS_EOK) {
+          return;
+      }
+  }
+  Result.clear();
+  Result.append(Buf.begin(), Buf.end());
 }
 } // end namespace path
 } // end namespace sys

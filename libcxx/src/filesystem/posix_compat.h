@@ -35,8 +35,8 @@
 # include <io.h>
 # include <winioctl.h>
 #elif defined(__MOLLENOS__)
-#include <os/mollenos.h>
-#include <io.h>
+# include <os/mollenos.h>
+# include <os/services/process.h>
 #else
 # include <unistd.h>
 # include <sys/stat.h>
@@ -516,13 +516,13 @@ struct StatVFS {
   uint64_t f_bavail;
 };
 
-void descriptor_to_stat(OsFileDescriptor_t* descriptor, struct StatT* buf)
+void descriptor_to_stat(OSFileDescriptor_t* descriptor, struct StatT* buf)
 {
-  buf->st_atim = descriptor->AccessedAt;
-  buf->st_mtim = descriptor->ModifiedAt;
-  buf->st_mode = 0555; // Read-only
-  if (!(descriptor->Permissions & FILE_PERMISSION_WRITE))
-    buf->st_mode |= 0222; // Write
+  buf->st_atim.tv_sec = descriptor->AccessedAt.Seconds;
+  buf->st_atim.tv_nsec = descriptor->AccessedAt.Nanoseconds;
+  buf->st_mtim.tv_sec = descriptor->ModifiedAt.Seconds;
+  buf->st_mtim.tv_nsec = descriptor->ModifiedAt.Nanoseconds;
+  buf->st_mode = descriptor->Permissions;
   if (descriptor->Flags & FILE_FLAG_DIRECTORY) {
     buf->st_mode |= _S_IFDIR;
   } else {
@@ -547,36 +547,40 @@ int link(const char *oldname, const char *newname) {
 }
 
 int stat(const char *path, struct StatT* buf) {
-  OsFileDescriptor_t descriptor;
-  OsStatus_t         status = GetFileInformationFromPath(path, &descriptor);
-  if (status != OsSuccess) {
-    return OsStatusToErrno(status);
+  OSFileDescriptor_t descriptor;
+  oserr_t            status = GetFileInformationFromPath(path, 1, &descriptor);
+  if (status != OS_EOK) {
+    return OsErrToErrNo(status);
   }
   descriptor_to_stat(&descriptor, buf);
   return 0;
 }
 
 int fstat(int fd, struct StatT *buf) {
-  OsFileDescriptor_t descriptor;
-  OsStatus_t         status = GetFileInformationFromFd(fd, &descriptor);
-  if (status != OsSuccess) {
-    return OsStatusToErrno(status);
+  OSFileDescriptor_t descriptor;
+  oserr_t            status = GetFileInformationFromFd(fd, &descriptor);
+  if (status != OS_EOK) {
+    return OsErrToErrNo(status);
   }
   descriptor_to_stat(&descriptor, buf);
   return 0;
 }
 
 int lstat(const char *path, struct StatT *buf) {
-  // stat symbolic link itself, not the file it refers to
-  // @todo link control when statting paths
-  return stat(path, buf);
+  OSFileDescriptor_t descriptor;
+  oserr_t            status = GetFileInformationFromPath(path, 0, &descriptor);
+  if (status != OS_EOK) {
+    return OsErrToErrNo(status);
+  }
+  descriptor_to_stat(&descriptor, buf);
+  return 0;
 }
 
 char* getcwd(char *buf, size_t size) {
-  char       tmp[_MAXPATH] = { 0 };
-  OsStatus_t status = GetWorkingDirectory(&tmp[0], _MAXPATH);
-  if (status != OsSuccess) {
-    OsStatusToErrno(status);
+  char    tmp[_MAXPATH] = { 0 };
+  oserr_t status = OSProcessWorkingDirectory(UUID_INVALID, &tmp[0], _MAXPATH);
+  if (status != OS_EOK) {
+    OsErrToErrNo(status);
     return NULL;
   }
   
@@ -584,70 +588,47 @@ char* getcwd(char *buf, size_t size) {
     _set_errno(ERANGE);
     return NULL;
   }
-
-  if (!buf) {
-    buf = (char*)malloc(strlen(&tmp[0]) + 1);
-  }
-  memcpy(buf, &tmp[0], strlen(&tmp[0]) + 1);
-  return buf;
+  return strdup(&tmp[0]);
 }
 
 int chdir(const char *path) {
-  OsStatus_t status = SetWorkingDirectory(path);
-  return OsStatusToErrno(status);
+  return OsErrToErrNo(OSProcessSetWorkingDirectory(path));
 }
 
 int chmod(const char *path, int perms) {
-  OsStatus_t status;
-  int        access = FILE_PERMISSION_READ;
-
-  if (perms & 0222)
-    access |= FILE_PERMISSION_WRITE;
-
-  status = ChangeFilePermissionsFromPath(path, access);
-  return OsStatusToErrno(status);
+  return OsErrToErrNo(ChangeFilePermissionsFromPath(path, (unsigned int)perms));
 }
 
 int fchmod(int fd, int perms) {
-  OsStatus_t status;
-  int        access = FILE_PERMISSION_READ;
-
-  if (perms & 0222)
-    access |= FILE_PERMISSION_WRITE;
-
-  status = ChangeFilePermissionsFromFd(fd, access);
-  return OsStatusToErrno(status);
+  return OsErrToErrNo(ChangeFilePermissionsFromFd(fd, (unsigned int)perms));
 }
 
 int ftruncate(int fd, SSizeT length) {
-  OsStatus_t status = SetFileSizeFromFd(fd, length);
-  return OsStatusToErrno(status);
+  return OsErrToErrNo(SetFileSizeFromFd(fd, length));
 }
 
 int truncate(const char *path, SSizeT length) {
-  OsStatus_t status = SetFileSizeFromPath(path, length);
-  return OsStatusToErrno(status);
+  return OsErrToErrNo(SetFileSizeFromPath(path, length));
 }
 
 int readlink(const char *path, char *buf, size_t size) {
-  OsStatus_t status = GetFileLink(path, buf, size);
-  return OsStatusToErrno(status);
+  return OsErrToErrNo(GetFileLink(path, buf, size));
 }
 
 char* realpath(const char *path, char *buf) {
-  // @todo should dereference symbolic links and canonicalize path
-  OsStatus_t status = PathCanonicalize(path, buf, _MAXPATH);
-  if (status != OsSuccess) {
+  oserr_t status = OSGetFullPath(path, 1, buf, _MAXPATH);
+  if (status != OS_EOK) {
+    (void)OsErrToErrNo(status);
     return NULL;
   }
   return buf;
 }
 
 int statvfs(const char *path, struct StatVFS *buf) {
-  OsFileSystemDescriptor_t descriptor;
-  OsStatus_t status = GetFileSystemInformationFromPath(path, &descriptor);
-  if (status != OsSuccess) {
-    return OsStatusToErrno(status);
+  OSFileSystemDescriptor_t descriptor;
+  oserr_t status = GetFileSystemInformationFromPath(path, 1, &descriptor);
+  if (status != OS_EOK) {
+    return OsErrToErrNo(status);
   }
 
   buf->f_frsize = descriptor.BlockSize;

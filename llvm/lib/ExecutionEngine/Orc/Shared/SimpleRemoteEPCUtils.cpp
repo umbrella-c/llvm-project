@@ -15,7 +15,7 @@
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/FormatVariadic.h"
 
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(__VALI__)
 #include <unistd.h>
 #else
 #include <io.h>

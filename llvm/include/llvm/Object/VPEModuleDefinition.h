@@ -40,7 +40,7 @@ struct VPEModuleDefinition {
 };
 
 Expected<VPEModuleDefinition>
-parseVPEModuleDefinition(MemoryBufferRef MB, COFF::MachineTypes Machine);
+parseVPEModuleDefinition(MemoryBufferRef MB, VPE::MachineTypes Machine);
 
 } // End namespace object.
 } // End namespace llvm.

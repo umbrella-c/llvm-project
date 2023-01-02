@@ -37,7 +37,7 @@ if (CAN_USE_ASSEMBLER)
     else()
       disable_blake3_x86_simd()
     endif()
-  elseif(WIN32 OR CYGWIN)
+  elseif(WIN32 OR CYGWIN OR VALI)
     check_symbol_exists(__x86_64__ "" IS_X64)
     if (IS_X64)
       list(APPEND LLVM_BLAKE3_FILES

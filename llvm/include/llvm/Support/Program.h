@@ -40,7 +40,7 @@ namespace sys {
   typedef unsigned long procid_t; // Must match the type of DWORD on Windows.
   typedef void *process_t;        // Must match the type of HANDLE on Windows.
 #elif defined(LLVM_ON_VALI)
-  typedef UUId_t procid_t;
+  typedef uuid_t procid_t;
   typedef procid_t process_t;
 #else
   typedef ::pid_t procid_t;

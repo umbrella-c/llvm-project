@@ -526,7 +526,7 @@ inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
     return true;
 #elif defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) && defined(MOLLENOS)
   UnwindSection_t section;
-  if (UnwindGetSection((void*)targetAddr, &section) == OsSuccess) {
+  if (UnwindGetSection((void*)targetAddr, &section) == OS_EOK) {
     info.dso_base             = (uintptr_t)section.ModuleBase;
     info.dwarf_section        = (uintptr_t)section.UnwindSectionBase;
     info.dwarf_section_length = section.UnwindSectionLength;

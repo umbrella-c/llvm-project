@@ -120,7 +120,7 @@ void tools::Vali::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   CmdArgs.push_back(Args.MakeArgString(std::string("-out:") + Output.getFilename()));
 
-  if (TC.getSanitizerArgs().needsAsanRt()) {
+  if (TC.getSanitizerArgs(Args).needsAsanRt()) {
     if (Args.hasArg(options::OPT_shared)) {
       CmdArgs.push_back(TC.getCompilerRTArgString(Args, "asan_dll_thunk"));
     } else {
@@ -147,14 +147,15 @@ void tools::Vali::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     // If we are compiling native then try to find the linker through our
     // environmental variables
     Exec = Args.MakeArgString("$bin/lld-link");
-  }
-  else {
-    // Cross-compiling to Vali, expect CROSS to be defined
+  } else {
+    // Cross-compiling to Vali, expect CROSS (backwards-compat) or VALICC (preferred) to be defined
     if (Optional<std::string> CrossCompilerPath =
+            llvm::sys::Process::GetEnv("VALICC")) {
+      Exec = Args.MakeArgString(*CrossCompilerPath + "/bin/lld-link");
+    } else if (Optional<std::string> CrossCompilerPath =
             llvm::sys::Process::GetEnv("CROSS")) {
       Exec = Args.MakeArgString(*CrossCompilerPath + "/bin/lld-link");
-    }
-    else {
+    } else {
       // hope it's in path
       Exec = Args.MakeArgString("lld-link");
     }
@@ -220,24 +221,29 @@ ValiToolChain::ValiToolChain(const Driver &D, const llvm::Triple &T,
                              const llvm::opt::ArgList &Args)
     : ToolChain(D, T, Args) {}
 
-bool ValiToolChain::IsUnwindTablesDefault(const ArgList &Args) const {
+ToolChain::UnwindTableLevel
+ValiToolChain::getDefaultUnwindTableLevel(const ArgList &Args) const {
   // All non-x86_32 Windows targets require unwind tables. However, LLVM
   // doesn't know how to generate them for all targets, so only enable
   // the ones that are actually implemented.
-  return getArch() == llvm::Triple::x86_64 ||
-         getArch() == llvm::Triple::aarch64;
+  if (getArch() == llvm::Triple::x86_64 || getArch() == llvm::Triple::arm ||
+      getArch() == llvm::Triple::thumb || getArch() == llvm::Triple::aarch64)
+    return UnwindTableLevel::Asynchronous;
+
+  return UnwindTableLevel::None;
 }
 
 bool ValiToolChain::isPICDefault() const {
   return getArch() == llvm::Triple::x86_64;
 }
 
-bool ValiToolChain::isPIEDefault() const {
+bool ValiToolChain::isPIEDefault(const llvm::opt::ArgList &Args) const {
   return false;
 }
 
 bool ValiToolChain::isPICDefaultForced() const {
-  return getArch() == llvm::Triple::x86_64;
+  return getArch() == llvm::Triple::x86_64 ||
+         getArch() == llvm::Triple::aarch64;
 }
 
 void ValiToolChain::AddClangSystemIncludeArgs(
@@ -270,11 +276,6 @@ void ValiToolChain::AddClangSystemIncludeArgs(
       auto IncludePath = *SdkIncludePath + "/include";
       addSystemInclude(DriverArgs, CC1Args, IncludePath);
     }
-    if (Optional<std::string> DdkIncludePath =
-            llvm::sys::Process::GetEnv("VALI_DDK_PATH")) {
-      auto IncludePath = *DdkIncludePath + "/include";
-      addSystemInclude(DriverArgs, CC1Args, IncludePath);
-    }
   }
   AddSystemAfterIncludes();
 }
@@ -291,11 +292,10 @@ void ValiToolChain::AddClangCXXStdlibIncludeArgs(
     const std::string CxxStdInclude = "$shr/include/c++/v1";
     if (GetCXXStdlibType(DriverArgs) == ToolChain::CST_Libcxx)
       addSystemInclude(DriverArgs, CC1Args, CxxStdInclude);
-  }
-  else {
+  } else {
     if (GetCXXStdlibType(DriverArgs) == ToolChain::CST_Libcxx) {
-      if (Optional<std::string> CrossCompilerPath =
-              llvm::sys::Process::GetEnv("CROSS")) {
+      if (Optional<std::string> CrossCompilerPath = 
+            llvm::sys::Process::GetEnv("VALI_SDK_PATH")) {
         auto IncludePath = *CrossCompilerPath + "/include/c++/v1";
         addSystemInclude(DriverArgs, CC1Args, IncludePath);
       }
@@ -314,7 +314,6 @@ void ValiToolChain::AddCXXStdlibLibArgs(
       CC1Args.push_back("c++abi.lib");
     } else {
       CC1Args.push_back("c++.dll.lib");
-      CC1Args.push_back("c++abi.dll.lib");
     }
     CC1Args.push_back("unwind.dll.lib");
   }

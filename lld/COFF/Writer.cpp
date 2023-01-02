@@ -1540,8 +1540,8 @@ template <typename PEHeaderTy> void Writer::writeHeader() {
   // VPE Only - Store the Relocations in the GLOBAL_PTR so we can perform these relocations
   // as a part of the image loading.
   if (config->vpe) {
-    Symbol *relocSymStart = symtab->findUnderscore("__RUNTIME_PSEUDO_RELOC_LIST__");
-    Symbol *relocSymEnd = symtab->findUnderscore("__RUNTIME_PSEUDO_RELOC_LIST_END__");
+    Symbol *relocSymStart = ctx.symtab.findUnderscore("__RUNTIME_PSEUDO_RELOC_LIST__");
+    Symbol *relocSymEnd = ctx.symtab.findUnderscore("__RUNTIME_PSEUDO_RELOC_LIST_END__");
     if (relocSymStart && relocSymEnd) {
       Defined *b = dyn_cast<Defined>(relocSymStart);
       Defined *c = dyn_cast<Defined>(relocSymEnd);

@@ -18,6 +18,7 @@
 #include "llvm/Support/ErrorHandling.h"
 
 #include <os/mollenos.h>
+#include <os/threads.h>
 #include <threads.h>
 
 /// This function builds an error message into \p ErrMsg using the \p prefix
@@ -38,11 +39,10 @@ static inline bool MakeErrMsg(
 }
 
 // Include StrError(errnum) in a fatal error message.
-LLVM_ATTRIBUTE_NORETURN static inline void ReportErrnumFatal(const char *Msg,
-                                                             int errnum) {
+[[noreturn]] static inline void ReportErrnumFatal(const char *Msg, int errnum) {
   std::string ErrMsg;
   MakeErrMsg(&ErrMsg, Msg, errnum);
-  llvm::report_fatal_error(ErrMsg);
+  llvm::report_fatal_error(llvm::Twine(ErrMsg));
 }
 
 namespace {
@@ -127,13 +127,13 @@ void llvm::set_thread_name(const Twine &Name) {
   if (get_max_thread_name_length() > 0)
     NameStr = NameStr.take_back(get_max_thread_name_length());
   (void)NameStr;
-  ::SetCurrentThreadName(NameStr.data());
+  ::ThreadsSetName(NameStr.data());
 }
 
 void llvm::get_thread_name(SmallVectorImpl<char> &Name) {
   Name.clear();
   char Buffer[get_max_thread_name_length_impl()] = { 0 };
-  GetCurrentThreadName(&Buffer[0], get_max_thread_name_length_impl());
+  ThreadsGetName(&Buffer[0], get_max_thread_name_length_impl());
   Name.append(Buffer, Buffer + strlen(Buffer));
 }
 
@@ -146,4 +146,21 @@ int computeHostNumHardwareThreads() {
   if (unsigned Val = std::thread::hardware_concurrency())
     return Val;
   return 1;
+}
+
+int llvm::get_physical_cores() {
+  OSSystemCPUInfo_t cpuInfo;
+  oserr_t           oserr;
+  size_t            bytesQueried;
+
+  oserr = OSSystemQuery(
+          OSSYSTEMQUERY_CPUINFO,
+          &cpuInfo,
+          sizeof(OSSystemCPUInfo_t),
+          &bytesQueried
+  );
+  if (oserr != OS_EOK) {
+      return 1;
+  }
+  return (int)cpuInfo.NumberOfActiveCores;
 }

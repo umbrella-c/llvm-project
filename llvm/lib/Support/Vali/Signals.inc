@@ -24,6 +24,7 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
 #include <os/mollenos.h>
+#include <os/services/file.h>
 #include <algorithm>
 #include <unwind.h>
 #include <signal.h>
@@ -33,7 +34,8 @@
 
 using namespace llvm;
 
-static RETSIGTYPE SignalHandler(int Sig);  // defined below.
+static void SignalHandler(int Sig);     // defined below.
+static void InfoSignalHandler(int Sig); // defined below.
 
 using SignalHandlerFunctionType = void (*)();
 /// The function to call if ctrl-c is pressed.
@@ -118,8 +120,8 @@ public:
       if (char *path = currentFile->Filename.exchange(nullptr)) {
         // Get the status so we can determine if it's a file or directory. If we
         // can't stat the file, ignore it.
-        OsFileDescriptor_t buf;
-        if (GetFileInformationFromPath(path, &buf) != OsSuccess)
+        OSFileDescriptor_t buf;
+        if (GetFileInformationFromPath(path, 1, &buf) != OS_EOK)
           continue;
 
         // If this is not a regular file, ignore it. We want to prevent removal
@@ -159,51 +161,54 @@ struct FilesToRemoveCleanup {
 
 static StringRef Argv0;
 
-// Signals that represent requested termination. There's no bug or failure, or
-// if there is, it's not our direct responsibility. For whatever reason, our
-// continued execution is no longer desirable.
-static const int IntSigs[] = {
-  SIGHUP, SIGINT, SIGPIPE, SIGTERM, SIGUSR1, SIGUSR2
-};
+/// Signals that represent requested termination. There's no bug or failure, or
+/// if there is, it's not our direct responsibility. For whatever reason, our
+/// continued execution is no longer desirable.
+static const int IntSigs[] = {SIGHUP, SIGINT, SIGTERM, SIGUSR2};
 
-// Signals that represent that we have a bug, and our prompt termination has
-// been ordered.
-static const int KillSigs[] = {
-  SIGILL, SIGTRAP, SIGABRT, SIGFPE, SIGBUS, SIGSEGV, SIGQUIT
+/// Signals that represent that we have a bug, and our prompt termination has
+/// been ordered.
+static const int KillSigs[] = {SIGILL,
+                               SIGTRAP,
+                               SIGABRT,
+                               SIGFPE,
+                               SIGBUS,
+                               SIGSEGV,
+                               SIGQUIT
 #ifdef SIGSYS
-  , SIGSYS
+                               ,
+                               SIGSYS
 #endif
 #ifdef SIGXCPU
-  , SIGXCPU
+                               ,
+                               SIGXCPU
 #endif
 #ifdef SIGXFSZ
-  , SIGXFSZ
+                               ,
+                               SIGXFSZ
 #endif
 #ifdef SIGEMT
-  , SIGEMT
+                               ,
+                               SIGEMT
 #endif
 };
 
-static const size_t NumSigs =
-    array_lengthof(IntSigs) + array_lengthof(KillSigs) + 1 /* SIGPIPE */;
+/// Signals that represent requests for status.
+static const int InfoSigs[] = {SIGUSR1
+#ifdef SIGINFO
+                               ,
+                               SIGINFO
+#endif
+};
+
+static const size_t NumSigs = std::size(IntSigs) + std::size(KillSigs) +
+                              std::size(InfoSigs) + 1 /* SIGPIPE */;
 
 static std::atomic<unsigned> NumRegisteredSignals = ATOMIC_VAR_INIT(0);
 static struct {
   __sa_handler_t SA;
   int SigNo;
 } RegisteredSignalInfo[NumSigs];
-
-
-static void RegisterHandler(int Signal) {
-  //unsigned Index = NumRegisteredSignals.load();
-  assert(Index < array_lengthof(RegisteredSignalInfo) &&
-         "Out of space for signal handlers!");
-         
-  // Install the new handler, save the old one in RegisteredSignalInfo.
-  RegisteredSignalInfo[NumRegisteredSignals].SA = signal(Signal, SignalHandler);
-  RegisteredSignalInfo[NumRegisteredSignals].SigNo = Signal;
-  ++NumRegisteredSignals;
-}
 
 static void RegisterHandlers() {
   // The mutex prevents other threads from registering handlers while we're
@@ -216,8 +221,37 @@ static void RegisterHandlers() {
   if (NumRegisteredSignals.load() != 0)
     return;
 
-  for (auto S : IntSigs) RegisterHandler(S);
-  for (auto S : KillSigs) RegisterHandler(S);
+  enum class SignalKind { IsKill, IsInfo };
+  auto registerHandler = [&](int Signal, SignalKind Kind) {
+    unsigned Index = NumRegisteredSignals.load();
+    assert(Index < std::size(RegisteredSignalInfo) &&
+           "Out of space for signal handlers!");
+
+    __sa_handler_t NewHandler;
+
+    switch (Kind) {
+    case SignalKind::IsKill:
+      NewHandler = SignalHandler;
+      break;
+    case SignalKind::IsInfo:
+      NewHandler = InfoSignalHandler;
+      break;
+    }
+    
+    // Install the new handler, save the old one in RegisteredSignalInfo.
+    RegisteredSignalInfo[Index].SA = signal(Signal, NewHandler);
+    RegisteredSignalInfo[Index].SigNo = Signal;
+    ++NumRegisteredSignals;
+  };
+
+  for (auto S : IntSigs)
+    registerHandler(S, SignalKind::IsKill);
+  for (auto S : KillSigs)
+    registerHandler(S, SignalKind::IsKill);
+  if (OneShotPipeSignalFunction)
+    registerHandler(SIGPIPE, SignalKind::IsKill);
+  for (auto S : InfoSigs)
+    registerHandler(S, SignalKind::IsInfo);
 }
 
 void sys::unregisterHandlers() {
@@ -245,7 +279,7 @@ void sys::CleanupOnSignal(uintptr_t Context) {
 }
 
 // The signal handler that runs.
-static RETSIGTYPE SignalHandler(int Sig) {
+static void SignalHandler(int Sig) {
   // Restore the signal behavior to default, so that the program actually
   // crashes when we return and the signal reissues.  This also ensures that if
   // we crash in our signal handler that the program will terminate immediately
@@ -273,20 +307,15 @@ static RETSIGTYPE SignalHandler(int Sig) {
 
   // Otherwise if it is a fault (like SEGV) run any handler.
   llvm::sys::RunSignalHandlers();
-
-#ifdef __s390__
-  // On S/390, certain signals are delivered with PSW Address pointing to
-  // *after* the faulting instruction.  Simply returning from the signal
-  // handler would continue execution after that point, instead of
-  // re-raising the signal.  Raise the signal manually in those cases.
-  if (Sig == SIGILL || Sig == SIGFPE || Sig == SIGTRAP)
-    raise(Sig);
-#endif
 }
 
-void llvm::sys::RunInterruptHandlers() {
-  RemoveFilesToRemove();
+static void InfoSignalHandler(int Sig) {
+  SaveAndRestore SaveErrnoDuringASignalHandler(errno);
+  if (SignalHandlerFunctionType CurrentInfoFunction = InfoSignalFunction)
+    CurrentInfoFunction();
 }
+
+void llvm::sys::RunInterruptHandlers() { RemoveFilesToRemove(); }
 
 void llvm::sys::SetInterruptFunction(void (*IF)()) {
   InterruptFunction.exchange(IF);
@@ -294,7 +323,8 @@ void llvm::sys::SetInterruptFunction(void (*IF)()) {
 }
 
 void llvm::sys::SetInfoSignalFunction(void (*Handler)()) {
-  // Unimplemented.
+  InfoSignalFunction.exchange(Handler);
+  RegisterHandlers();
 }
 
 void llvm::sys::SetOneShotPipeSignalFunction(void (*Handler)()) {
@@ -303,7 +333,8 @@ void llvm::sys::SetOneShotPipeSignalFunction(void (*Handler)()) {
 }
 
 void llvm::sys::DefaultOneShotPipeSignalHandler() {
-  // Unimplemented.
+  // Send a special return code that drivers can check for, from sysexits.h.
+  exit(-7775);
 }
 
 // The public API
@@ -380,11 +411,6 @@ void llvm::sys::PrintStackTrace(raw_ostream &OS, int Depth) {
 #if ENABLE_BACKTRACES
   static void *StackTrace[256];
   int depth = 0;
-#if defined(HAVE_BACKTRACE)
-  // Use backtrace() to output a backtrace on Linux systems with glibc.
-  if (!depth)
-    depth = backtrace(StackTrace, static_cast<int>(array_lengthof(StackTrace)));
-#endif
 #if defined(HAVE__UNWIND_BACKTRACE)
   // Try _Unwind_Backtrace() if backtrace() failed.
   if (!depth)
@@ -439,8 +465,6 @@ void llvm::sys::PrintStackTrace(raw_ostream &OS, int Depth) {
     }
     OS << '\n';
   }
-#elif defined(HAVE_BACKTRACE)
-  backtrace_symbols_fd(StackTrace, depth, STDERR_FILENO);
 #endif
 #endif
 }

@@ -1260,7 +1260,7 @@ MCSection *MCObjectFileInfo::getDwarfComdatSection(const char *Name,
     return Ctx->getWasmSection(Name, SectionKind::getMetadata(), 0,
                                utostr(Hash), MCContext::GenericSectionID);
   case Triple::VPE:
-    return Ctx->getVPESection(Name);
+    return Ctx->getVPESection(Name, 0, SectionKind::getMetadata());
   case Triple::MachO:
   case Triple::COFF:
   case Triple::GOFF:

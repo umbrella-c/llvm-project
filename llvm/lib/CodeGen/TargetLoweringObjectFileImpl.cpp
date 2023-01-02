@@ -2716,7 +2716,7 @@ static int getSelectionForVPE(const GlobalValue *GV) {
   if (const Comdat *C = GV->getComdat()) {
     const GlobalValue *ComdatKey = getComdatGVForVPE(GV);
     if (const auto *GA = dyn_cast<GlobalAlias>(ComdatKey))
-      ComdatKey = GA->getBaseObject();
+      ComdatKey = GA->getAliaseeObject();
     if (ComdatKey == GV) {
       switch (C->getSelectionKind()) {
       case Comdat::Any:
@@ -2895,11 +2895,11 @@ void TargetLoweringObjectFileVPE::emitModuleMetadata(MCStreamer &Streamer,
                               COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
                               COFF::IMAGE_SCN_MEM_READ,
                               SectionKind::getReadOnly());
-    Streamer.SwitchSection(S);
+    Streamer.switchSection(S);
     Streamer.emitLabel(C.getOrCreateSymbol(StringRef("OBJC_IMAGE_INFO")));
     Streamer.emitInt32(Version);
     Streamer.emitInt32(Flags);
-    Streamer.AddBlankLine();
+    Streamer.addBlankLine();
   }
 
   emitCGProfileMetadata(Streamer, M);
@@ -2912,7 +2912,7 @@ void TargetLoweringObjectFileVPE::emitLinkerDirectives(
     // spec, this section is a space-separated string containing flags for
     // linker.
     MCSection *Sec = getDrectveSection();
-    Streamer.SwitchSection(Sec);
+    Streamer.switchSection(Sec);
     for (const auto *Option : LinkerOptions->operands()) {
       for (const auto &Piece : cast<MDNode>(Option)->operands()) {
         // Lead with a space for consistency with our dllexport implementation.
@@ -2931,7 +2931,7 @@ void TargetLoweringObjectFileVPE::emitLinkerDirectives(
                                  getMangler());
     OS.flush();
     if (!Flags.empty()) {
-      Streamer.SwitchSection(getDrectveSection());
+      Streamer.switchSection(getDrectveSection());
       Streamer.emitBytes(Flags);
     }
     Flags.clear();
@@ -2957,7 +2957,7 @@ void TargetLoweringObjectFileVPE::emitLinkerDirectives(
         OS.flush();
 
         if (!Flags.empty()) {
-          Streamer.SwitchSection(getDrectveSection());
+          Streamer.switchSection(getDrectveSection());
           Streamer.emitBytes(Flags);
         }
         Flags.clear();

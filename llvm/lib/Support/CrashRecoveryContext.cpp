@@ -342,12 +342,12 @@ static void uninstallExceptionOrSignalHandlers() {
 
 static const int Signals[] =
     { SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGSEGV, SIGTRAP };
-static const unsigned NumSignals = array_lengthof(Signals);
+static const unsigned NumSignals = std::size(Signals);
 static __sa_handler_t PrevActions[NumSignals];
 
 static void CrashRecoverySignalHandler(int Signal) {
   // Lookup the current thread local recovery object.
-  const CrashRecoveryContextImpl *CRCI = CurrentContext->get();
+  const CrashRecoveryContextImpl *CRCI = getCurrentContext().get();
 
   if (!CRCI) {
     // We didn't find a crash recovery context -- this means either we got a
@@ -367,9 +367,17 @@ static void CrashRecoverySignalHandler(int Signal) {
     return;
   }
   
+  // Return the same error code as if the program crashed, as mentioned in the
+  // section "Exit Status for Commands":
+  // https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xcu_chap02.html
   int RetCode = 128 + Signal;
+
+  // Don't consider a broken pipe as a crash (see clang/lib/Driver/Driver.cpp)
+  if (Signal == SIGPIPE)
+    RetCode = -1;
+
   if (CRCI)
-    const_cast<CrashRecoveryContextImpl*>(CRCI)->HandleCrash(RetCode, Signal);
+    const_cast<CrashRecoveryContextImpl *>(CRCI)->HandleCrash(RetCode, Signal);
 }
 
 static void installExceptionOrSignalHandlers() {

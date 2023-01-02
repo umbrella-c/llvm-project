@@ -18,7 +18,6 @@ static_assert(sizeof(std::__libcpp_refstring) == sizeof(const char*), "");
 
 namespace std // purposefully not using versioning namespace
 {
-#ifndef __MOLLENOS__
 logic_error::logic_error(const string& msg) : __imp_(msg.c_str()) {}
 
 logic_error::logic_error(const char* msg) : __imp_(msg) {}
@@ -41,7 +40,6 @@ runtime_error& runtime_error::operator=(const runtime_error& re) noexcept {
   __imp_ = re.__imp_;
   return *this;
 }
-#endif
 
 #if !defined(_LIBCPPABI_VERSION) && !defined(LIBSTDCXX)
 

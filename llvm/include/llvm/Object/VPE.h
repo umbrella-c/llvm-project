@@ -14,7 +14,7 @@
 #define LLVM_OBJECT_VPE_H
 
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/BinaryFormat/COFF.h"
+#include "llvm/BinaryFormat/VPE.h"
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Object/Binary.h"
 #include "llvm/Object/CVDebugRecord.h"
@@ -249,7 +249,7 @@ struct vpe_StringTableOffset {
 template <typename SectionNumberType>
 struct vpe_symbol {
   union {
-    char ShortName[COFF::NameSize];
+    char ShortName[VPE::NameSize];
     vpe_StringTableOffset Offset;
   } Name;
 
@@ -268,7 +268,7 @@ using vpe_symbol32 = vpe_symbol<support::ulittle32_t>;
 // Contains only common parts of vpe_symbol16 and vpe_symbol32.
 struct vpe_symbol_generic {
   union {
-    char ShortName[COFF::NameSize];
+    char ShortName[VPE::NameSize];
     vpe_StringTableOffset Offset;
   } Name;
   support::ulittle32_t Value;
@@ -320,7 +320,7 @@ public:
     assert(isSet() && "VPESymbolRef points to nothing!");
     if (CS16) {
       // Reserved sections are returned as negative numbers.
-      if (CS16->SectionNumber <= COFF::MaxNumberOfSections16)
+      if (CS16->SectionNumber <= VPE::MaxNumberOfSections16)
         return CS16->SectionNumber;
       return static_cast<int16_t>(CS16->SectionNumber);
     }
@@ -345,7 +345,7 @@ public:
   uint8_t getBaseType() const { return getType() & 0x0F; }
 
   uint8_t getComplexType() const {
-    return (getType() & 0xF0) >> COFF::SCT_COMPLEX_TYPE_SHIFT;
+    return (getType() & 0xF0) >> VPE::SCT_COMPLEX_TYPE_SHIFT;
   }
 
   template <typename T> const T *getAux() const {
@@ -355,14 +355,14 @@ public:
 
   const vpe_aux_section_definition *getSectionDefinition() const {
     if (!getNumberOfAuxSymbols() ||
-        getStorageClass() != COFF::IMAGE_SYM_CLASS_STATIC)
+        getStorageClass() != VPE::IMAGE_SYM_CLASS_STATIC)
       return nullptr;
     return getAux<vpe_aux_section_definition>();
   }
 
   const vpe_aux_weak_external *getWeakExternal() const {
     if (!getNumberOfAuxSymbols() ||
-        getStorageClass() != COFF::IMAGE_SYM_CLASS_WEAK_EXTERNAL)
+        getStorageClass() != VPE::IMAGE_SYM_CLASS_WEAK_EXTERNAL)
       return nullptr;
     return getAux<vpe_aux_weak_external>();
   }
@@ -372,31 +372,31 @@ public:
   }
 
   bool isExternal() const {
-    return getStorageClass() == COFF::IMAGE_SYM_CLASS_EXTERNAL;
+    return getStorageClass() == VPE::IMAGE_SYM_CLASS_EXTERNAL;
   }
 
   bool isCommon() const {
-    return isExternal() && getSectionNumber() == COFF::IMAGE_SYM_UNDEFINED &&
+    return isExternal() && getSectionNumber() == VPE::IMAGE_SYM_UNDEFINED &&
            getValue() != 0;
   }
 
   bool isUndefined() const {
-    return isExternal() && getSectionNumber() == COFF::IMAGE_SYM_UNDEFINED &&
+    return isExternal() && getSectionNumber() == VPE::IMAGE_SYM_UNDEFINED &&
            getValue() == 0;
   }
 
   bool isWeakExternal() const {
-    return getStorageClass() == COFF::IMAGE_SYM_CLASS_WEAK_EXTERNAL;
+    return getStorageClass() == VPE::IMAGE_SYM_CLASS_WEAK_EXTERNAL;
   }
 
   bool isFunctionDefinition() const {
-    return isExternal() && getBaseType() == COFF::IMAGE_SYM_TYPE_NULL &&
-           getComplexType() == COFF::IMAGE_SYM_DTYPE_FUNCTION &&
-           !COFF::isReservedSectionNumber(getSectionNumber());
+    return isExternal() && getBaseType() == VPE::IMAGE_SYM_TYPE_NULL &&
+           getComplexType() == VPE::IMAGE_SYM_DTYPE_FUNCTION &&
+           !VPE::isReservedSectionNumber(getSectionNumber());
   }
 
   bool isFunctionLineInfo() const {
-    return getStorageClass() == COFF::IMAGE_SYM_CLASS_FUNCTION;
+    return getStorageClass() == VPE::IMAGE_SYM_CLASS_FUNCTION;
   }
 
   bool isAnyUndefined() const {
@@ -404,27 +404,27 @@ public:
   }
 
   bool isFileRecord() const {
-    return getStorageClass() == COFF::IMAGE_SYM_CLASS_FILE;
+    return getStorageClass() == VPE::IMAGE_SYM_CLASS_FILE;
   }
 
   bool isSection() const {
-    return getStorageClass() == COFF::IMAGE_SYM_CLASS_SECTION;
+    return getStorageClass() == VPE::IMAGE_SYM_CLASS_SECTION;
   }
 
   bool isSectionDefinition() const {
     // C++/CLI creates external ABS symbols for non-const appdomain globals.
     // These are also followed by an auxiliary section definition.
     bool isAppdomainGlobal =
-        getStorageClass() == COFF::IMAGE_SYM_CLASS_EXTERNAL &&
-        getSectionNumber() == COFF::IMAGE_SYM_ABSOLUTE;
-    bool isOrdinarySection = getStorageClass() == COFF::IMAGE_SYM_CLASS_STATIC;
+        getStorageClass() == VPE::IMAGE_SYM_CLASS_EXTERNAL &&
+        getSectionNumber() == VPE::IMAGE_SYM_ABSOLUTE;
+    bool isOrdinarySection = getStorageClass() == VPE::IMAGE_SYM_CLASS_STATIC;
     if (!getNumberOfAuxSymbols())
       return false;
     return isAppdomainGlobal || isOrdinarySection;
   }
 
   bool isCLRToken() const {
-    return getStorageClass() == COFF::IMAGE_SYM_CLASS_CLR_TOKEN;
+    return getStorageClass() == VPE::IMAGE_SYM_CLASS_CLR_TOKEN;
   }
 
 private:
@@ -435,7 +435,7 @@ private:
 };
 
 struct vpe_section {
-  char Name[COFF::NameSize];
+  char Name[VPE::NameSize];
   support::ulittle32_t VirtualSize;
   support::ulittle32_t VirtualAddress;
   support::ulittle32_t SizeOfRawData;
@@ -449,14 +449,14 @@ struct vpe_section {
   // Returns true if the actual number of relocations is stored in
   // VirtualAddress field of the first relocation table entry.
   bool hasExtendedRelocations() const {
-    return (Characteristics & COFF::IMAGE_SCN_LNK_NRELOC_OVFL) &&
+    return (Characteristics & VPE::IMAGE_SCN_LNK_NRELOC_OVFL) &&
            NumberOfRelocations == UINT16_MAX;
   }
 
   uint32_t getAlignment() const {
     // The IMAGE_SCN_TYPE_NO_PAD bit is a legacy way of getting to
     // IMAGE_SCN_ALIGN_1BYTES.
-    if (Characteristics & COFF::IMAGE_SCN_TYPE_NO_PAD)
+    if (Characteristics & VPE::IMAGE_SCN_TYPE_NO_PAD)
       return 1;
 
     // Bit [20:24] contains section alignment. 0 means use a default alignment
@@ -573,7 +573,7 @@ struct vpe_tls_directory {
 
   uint32_t getAlignment() const {
     // Bit [20:24] contains section alignment.
-    uint32_t Shift = (Characteristics & COFF::IMAGE_SCN_ALIGN_MASK) >> 20;
+    uint32_t Shift = (Characteristics & VPE::IMAGE_SCN_ALIGN_MASK) >> 20;
     if (Shift > 0)
       return 1U << (Shift - 1);
     return 0;
@@ -587,7 +587,7 @@ struct vpe_tls_directory {
       AlignBits = (llvm::Log2_32(Align) + 1) << 20;
     }
     Characteristics =
-        (Characteristics & ~COFF::IMAGE_SCN_ALIGN_MASK) | AlignBits;
+        (Characteristics & ~VPE::IMAGE_SCN_ALIGN_MASK) | AlignBits;
   }
 };
 

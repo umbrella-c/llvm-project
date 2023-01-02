@@ -12,7 +12,7 @@
 #include "llvm/DebugInfo/CodeView/DebugStringTableSubsection.h"
 #include "llvm/DebugInfo/CodeView/StringsAndChecksums.h"
 #include "llvm/Object/VPE.h"
-#include "llvm/ObjectYAML/COFFYAML.h"
+#include "llvm/ObjectYAML/VPEYAML.h"
 #include "llvm/ObjectYAML/CodeViewYAMLTypes.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/YAMLTraits.h"
@@ -23,7 +23,7 @@ namespace {
 
 class VPEDumper {
   const object::VPEObjectFile &Obj;
-  COFFYAML::Object YAMLObj;
+  VPEYAML::Object YAMLObj;
   template <typename T>
   void dumpOptionalHeader(T OptionalHeader);
   void dumpHeader();
@@ -32,7 +32,7 @@ class VPEDumper {
 
 public:
   VPEDumper(const object::VPEObjectFile &Obj);
-  COFFYAML::Object &getYAMLObj();
+  VPEYAML::Object &getYAMLObj();
 };
 
 }
@@ -50,7 +50,7 @@ VPEDumper::VPEDumper(const object::VPEObjectFile &Obj) : Obj(Obj) {
 }
 
 template <typename T> void VPEDumper::dumpOptionalHeader(T OptionalHeader) {
-  YAMLObj.OptionalHeader = COFFYAML::PEHeader();
+  YAMLObj.OptionalHeader = VPEYAML::PEHeader();
   YAMLObj.OptionalHeader->Header.AddressOfEntryPoint =
       OptionalHeader->AddressOfEntryPoint;
   YAMLObj.OptionalHeader->Header.ImageBase = OptionalHeader->ImageBase;
@@ -70,7 +70,7 @@ template <typename T> void VPEDumper::dumpOptionalHeader(T OptionalHeader) {
   YAMLObj.OptionalHeader->Header.MinorSubsystemVersion =
       OptionalHeader->MinorSubsystemVersion;
   YAMLObj.OptionalHeader->Header.Subsystem = OptionalHeader->Subsystem;
-  YAMLObj.OptionalHeader->Header.DLLCharacteristics =
+  YAMLObj.OptionalHeader->Header.DllCharacteristics =
       OptionalHeader->DLLCharacteristics;
   YAMLObj.OptionalHeader->Header.SizeOfStackReserve =
       OptionalHeader->SizeOfStackReserve;
@@ -85,7 +85,7 @@ template <typename T> void VPEDumper::dumpOptionalHeader(T OptionalHeader) {
     const object::vpe_data_directory *DD = Obj.getDataDirectory(I++);
     if (!DD)
       continue;
-    DestDD = COFF::DataDirectory();
+    DestDD = VPE::DataDirectory();
     DestDD->RelativeVirtualAddress = DD->RelativeVirtualAddress;
     DestDD->Size = DD->Size;
   }
@@ -125,7 +125,7 @@ initializeFileAndStringTable(const llvm::object::VPEObjectFile &Obj,
     uint32_t Magic;
 
     Err(Reader.readInteger(Magic));
-    assert(Magic == COFF::DEBUG_SECTION_MAGIC && "Invalid .debug$S section!");
+    assert(Magic == VPE::DEBUG_SECTION_MAGIC && "Invalid .debug$S section!");
 
     codeview::DebugSubsectionArray Subsections;
     Err(Reader.readArray(Subsections, Reader.bytesRemaining()));
@@ -135,7 +135,7 @@ initializeFileAndStringTable(const llvm::object::VPEObjectFile &Obj,
 }
 
 void VPEDumper::dumpSections(unsigned NumSections) {
-  std::vector<COFFYAML::Section> &YAMLSections = YAMLObj.Sections;
+  std::vector<VPEYAML::Section> &YAMLSections = YAMLObj.Sections;
   codeview::StringsAndChecksumsRef SC;
   initializeFileAndStringTable(Obj, SC);
 
@@ -152,7 +152,7 @@ void VPEDumper::dumpSections(unsigned NumSections) {
 
   for (const auto &ObjSection : Obj.sections()) {
     const object::vpe_section *VPESection = Obj.getVPESection(ObjSection);
-    COFFYAML::Section NewYAMLSection;
+    VPEYAML::Section NewYAMLSection;
 
     if (Expected<StringRef> NameOrErr = ObjSection.getName())
       NewYAMLSection.Name = *NameOrErr;
@@ -192,18 +192,17 @@ void VPEDumper::dumpSections(unsigned NumSections) {
     else if (NewYAMLSection.Name == ".debug$H")
       NewYAMLSection.DebugH = CodeViewYAML::fromDebugH(sectionData);
 
-    std::vector<COFFYAML::Relocation> Relocations;
+    std::vector<VPEYAML::Relocation> Relocations;
     for (const auto &Reloc : ObjSection.relocations()) {
       const object::vpe_relocation *reloc = Obj.getVPERelocation(Reloc);
-      COFFYAML::Relocation Rel;
+      VPEYAML::Relocation Rel;
       object::symbol_iterator Sym = Reloc.getSymbol();
       Expected<StringRef> SymbolNameOrErr = Sym->getName();
       if (!SymbolNameOrErr) {
        std::string Buf;
        raw_string_ostream OS(Buf);
        logAllUnhandledErrors(SymbolNameOrErr.takeError(), OS);
-       OS.flush();
-       report_fatal_error(Buf);
+       report_fatal_error(Twine(OS.str()));
       }
       if (SymbolUnique.lookup(*SymbolNameOrErr))
         Rel.SymbolName = *SymbolNameOrErr;
@@ -219,9 +218,9 @@ void VPEDumper::dumpSections(unsigned NumSections) {
 }
 
 static void
-dumpFunctionDefinition(COFFYAML::Symbol *Sym,
+dumpFunctionDefinition(VPEYAML::Symbol *Sym,
                        const object::vpe_aux_function_definition *ObjFD) {
-  COFF::AuxiliaryFunctionDefinition YAMLFD;
+  VPE::AuxiliaryFunctionDefinition YAMLFD;
   YAMLFD.TagIndex = ObjFD->TagIndex;
   YAMLFD.TotalSize = ObjFD->TotalSize;
   YAMLFD.PointerToLinenumber = ObjFD->PointerToLinenumber;
@@ -231,18 +230,18 @@ dumpFunctionDefinition(COFFYAML::Symbol *Sym,
 }
 
 static void
-dumpbfAndEfLineInfo(COFFYAML::Symbol *Sym,
-                    const object::coff_aux_bf_and_ef_symbol *ObjBES) {
-  COFF::AuxiliarybfAndefSymbol YAMLAAS;
+dumpbfAndEfLineInfo(VPEYAML::Symbol *Sym,
+                    const object::vpe_aux_bf_and_ef_symbol *ObjBES) {
+  VPE::AuxiliarybfAndefSymbol YAMLAAS;
   YAMLAAS.Linenumber = ObjBES->Linenumber;
   YAMLAAS.PointerToNextFunction = ObjBES->PointerToNextFunction;
 
   Sym->bfAndefSymbol = YAMLAAS;
 }
 
-static void dumpWeakExternal(COFFYAML::Symbol *Sym,
-                             const object::coff_aux_weak_external *ObjWE) {
-  COFF::AuxiliaryWeakExternal YAMLWE;
+static void dumpWeakExternal(VPEYAML::Symbol *Sym,
+                             const object::vpe_aux_weak_external *ObjWE) {
+  VPE::AuxiliaryWeakExternal YAMLWE;
   YAMLWE.TagIndex = ObjWE->TagIndex;
   YAMLWE.Characteristics = ObjWE->Characteristics;
 
@@ -250,10 +249,10 @@ static void dumpWeakExternal(COFFYAML::Symbol *Sym,
 }
 
 static void
-dumpSectionDefinition(COFFYAML::Symbol *Sym,
-                      const object::coff_aux_section_definition *ObjSD,
+dumpSectionDefinition(VPEYAML::Symbol *Sym,
+                      const object::vpe_aux_section_definition *ObjSD,
                       bool IsBigObj) {
-  COFF::AuxiliarySectionDefinition YAMLASD;
+  VPE::AuxiliarySectionDefinition YAMLASD;
   int32_t AuxNumber = ObjSD->getNumber(IsBigObj);
   YAMLASD.Length = ObjSD->Length;
   YAMLASD.NumberOfRelocations = ObjSD->NumberOfRelocations;
@@ -266,9 +265,9 @@ dumpSectionDefinition(COFFYAML::Symbol *Sym,
 }
 
 static void
-dumpCLRTokenDefinition(COFFYAML::Symbol *Sym,
-                       const object::coff_aux_clr_token *ObjCLRToken) {
-  COFF::AuxiliaryCLRToken YAMLCLRToken;
+dumpCLRTokenDefinition(VPEYAML::Symbol *Sym,
+                       const object::vpe_aux_clr_token *ObjCLRToken) {
+  VPE::AuxiliaryCLRToken YAMLCLRToken;
   YAMLCLRToken.AuxType = ObjCLRToken->AuxType;
   YAMLCLRToken.SymbolTableIndex = ObjCLRToken->SymbolTableIndex;
 
@@ -278,13 +277,13 @@ dumpCLRTokenDefinition(COFFYAML::Symbol *Sym,
 void VPEDumper::dumpSymbols(unsigned NumSymbols) {
   ExitOnError Err("invalid symbol table");
 
-  std::vector<COFFYAML::Symbol> &Symbols = YAMLObj.Symbols;
+  std::vector<VPEYAML::Symbol> &Symbols = YAMLObj.Symbols;
   for (const auto &S : Obj.symbols()) {
     object::VPESymbolRef Symbol = Obj.getVPESymbol(S);
-    COFFYAML::Symbol Sym;
+    VPEYAML::Symbol Sym;
     Sym.Name = Err(Obj.getSymbolName(Symbol));
-    Sym.SimpleType = COFF::SymbolBaseType(Symbol.getBaseType());
-    Sym.ComplexType = COFF::SymbolComplexType(Symbol.getComplexType());
+    Sym.SimpleType = VPE::SymbolBaseType(Symbol.getBaseType());
+    Sym.ComplexType = VPE::SymbolComplexType(Symbol.getComplexType());
     Sym.Header.StorageClass = Symbol.getStorageClass();
     Sym.Header.Value = Symbol.getValue();
     Sym.Header.SectionNumber = Symbol.getSectionNumber();
@@ -306,8 +305,8 @@ void VPEDumper::dumpSymbols(unsigned NumSymbols) {
         assert(Symbol.getNumberOfAuxSymbols() == 1 &&
                "Expected a single aux symbol to describe this function!");
 
-        const object::coff_aux_bf_and_ef_symbol *ObjBES =
-            reinterpret_cast<const object::coff_aux_bf_and_ef_symbol *>(
+        const object::vpe_aux_bf_and_ef_symbol *ObjBES =
+            reinterpret_cast<const object::vpe_aux_bf_and_ef_symbol *>(
                 AuxData.data());
         dumpbfAndEfLineInfo(&Sym, ObjBES);
       } else if (Symbol.isAnyUndefined()) {
@@ -315,8 +314,8 @@ void VPEDumper::dumpSymbols(unsigned NumSymbols) {
         assert(Symbol.getNumberOfAuxSymbols() == 1 &&
                "Expected a single aux symbol to describe this weak symbol!");
 
-        const object::coff_aux_weak_external *ObjWE =
-            reinterpret_cast<const object::coff_aux_weak_external *>(
+        const object::vpe_aux_weak_external *ObjWE =
+            reinterpret_cast<const object::vpe_aux_weak_external *>(
                 AuxData.data());
         dumpWeakExternal(&Sym, ObjWE);
       } else if (Symbol.isFileRecord()) {
@@ -330,8 +329,8 @@ void VPEDumper::dumpSymbols(unsigned NumSymbols) {
         assert(Symbol.getNumberOfAuxSymbols() == 1 &&
                "Expected a single aux symbol to describe this section!");
 
-        const object::coff_aux_section_definition *ObjSD =
-            reinterpret_cast<const object::coff_aux_section_definition *>(
+        const object::vpe_aux_section_definition *ObjSD =
+            reinterpret_cast<const object::vpe_aux_section_definition *>(
                 AuxData.data());
         dumpSectionDefinition(&Sym, ObjSD, Symbol.isBigObj());
       } else if (Symbol.isCLRToken()) {
@@ -339,8 +338,8 @@ void VPEDumper::dumpSymbols(unsigned NumSymbols) {
         assert(Symbol.getNumberOfAuxSymbols() == 1 &&
                "Expected a single aux symbol to describe this CLR Token!");
 
-        const object::coff_aux_clr_token *ObjCLRToken =
-            reinterpret_cast<const object::coff_aux_clr_token *>(
+        const object::vpe_aux_clr_token *ObjCLRToken =
+            reinterpret_cast<const object::vpe_aux_clr_token *>(
                 AuxData.data());
         dumpCLRTokenDefinition(&Sym, ObjCLRToken);
       } else {
@@ -351,7 +350,7 @@ void VPEDumper::dumpSymbols(unsigned NumSymbols) {
   }
 }
 
-COFFYAML::Object &VPEDumper::getYAMLObj() {
+VPEYAML::Object &VPEDumper::getYAMLObj() {
   return YAMLObj;
 }
 

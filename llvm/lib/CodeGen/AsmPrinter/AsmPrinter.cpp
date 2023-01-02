@@ -2174,7 +2174,7 @@ bool AsmPrinter::doFinalization(Module &M) {
       for (const auto &Stub : Stubs) {
         SmallString<256> SectionName = StringRef(".rdata$");
         SectionName += Stub.first->getName();
-        OutStreamer->SwitchSection(OutContext.getVPESection(
+        OutStreamer->switchSection(OutContext.getVPESection(
             SectionName,
             COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ |
                 COFF::IMAGE_SCN_LNK_COMDAT,

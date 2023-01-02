@@ -5,26 +5,32 @@ project:
     against the MollenOS/Vali operating system.
   author: Philip Meulengracht
   email: the_meulengracht@hotmail.com
-  version: 1.0.0
+  version: 16.0.0
   license: LGPL
   homepage: www.mollenos.com
 
-ingredients:
-- name: vali/clang-cc
-  channel: devel
-  platform: host
-  arch: host
-- name: vali/sdk-c
-  channel: devel
-- name: vali/zlib
-  channel: devel
+platforms:
+  - name: vali
+    toolchain: vali/clang-cc=devel
+    architectures: [amd64, i386]
 
-# There are a number of keywords that can be used in the recipe
-# steps during generate, build, install and package.
+environment:
+  host:
+    packages:
+      - build-essential
+      - cmake
+      - python3
+  build:
+    ingredients:
+      - name: vali/sdk-c
+        channel: devel
+      - name: vali/zlib
+        channel: devel
+
 recipes:
-  - name: llvm-projects
-    path: llvm
-    toolchain: vali/clang-cc
+  - name: llvm-runtimes
+    path: runtimes
+    toolchain: platform
     steps:
     - name: config
       type: generate
@@ -32,30 +38,61 @@ recipes:
       arguments:
         - -G
         - '"Unix Makefiles"'
-        - -DLLVM_ENABLE_PROJECTS='libcxx;libcxxabi;libunwind'
+        - -DLLVM_ENABLE_RUNTIMES='compiler-rt;libunwind;libcxxabi;libcxx;'
+        - -DCMAKE_BUILD_TYPE=Release
+        - -DLLVM_INCLUDE_TESTS=OFF
+        - -DLLVM_DEFAULT_TARGET_TRIPLE=$[[ CHEF_TARGET_ARCHITECTURE ]]-uml-vali
+        - -DLLVM_ENABLE_LLD=ON
+        - -DLLVM_ENABLE_LIBCXX=ON
+        - -DLIBCXXABI_USE_LLVM_UNWINDER=ON
+        - -DLIBCXXABI_ENABLE_SHARED=OFF
+        - -DLIBCXX_CXX_ABI='libcxxabi'
+        - -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON
+        - -DCMAKE_TOOLCHAIN_FILE=$[[ PROJECT_PATH ]]/chef/vali.cmake
+      env:
+        VALICC: $[[ TOOLCHAIN_PREFIX ]]/usr/local
+        VALI_ARCH: $[[ CHEF_TARGET_ARCHITECTURE ]]
+        VALI_SDK_PATH: $[[ BUILD_INGREDIENTS_PREFIX ]]
+        LIBCXX_BOOTSTRAP: true
+    - name: build runtimes
+      type: build
+      depends: [config]
+      system: make
+      arguments: [cxx, cxxabi, unwind, compiler-rt]
+      env:
+        VALICC: $[[ TOOLCHAIN_PREFIX ]]/usr/local
+        VALI_SDK_PATH: $[[ BUILD_INGREDIENTS_PREFIX ]]
+  - name: llvm-projects
+    path: llvm
+    toolchain: platform
+    steps:
+    - name: config
+      type: generate
+      system: cmake
+      arguments:
+        - -G
+        - '"Unix Makefiles"'
         - -DCMAKE_BUILD_TYPE=Release
         - -DLLVM_INCLUDE_TESTS=OFF
         - -DLLVM_INCLUDE_EXAMPLES=OFF
         - -DLLVM_INCLUDE_BENCHMARKS=OFF
-        - -DLLVM_BOOTSTRAP_RUNTIME=ON
         - -DLLVM_ENABLE_DUMP=ON
         - -DLLVM_TARGETS_TO_BUILD='X86'
-        - -DLLVM_DEFAULT_TARGET_TRIPLE=${{ CHEF_TARGET_ARCHITECTURE }}-uml-vali
-        - -DLLVM_ENABLE_LIBCXX=ON
-        - -DLIBCXXABI_USE_LLVM_UNWINDER=ON
-        - -DLIBCXX_CXX_ABI='libcxxabi'
-        - -DCMAKE_TOOLCHAIN_FILE=${{ PROJECT_PATH }}/llvm/cmake/platforms/Vali.cmake
+        - -DLLVM_DEFAULT_TARGET_TRIPLE=$[[ CHEF_TARGET_ARCHITECTURE ]]-uml-vali
+        - -DLLVM_ENABLE_LLD=ON
+        - -DCMAKE_TOOLCHAIN_FILE=$[[ PROJECT_PATH ]]/chef/vali.cmake
       env:
-        CROSS: ${{ TOOLCHAIN_PREFIX }}/usr/local
-        VALI_ARCH: ${{ CHEF_TARGET_ARCHITECTURE }}
-        VALI_SDK_PATH: ${{ INGREDIENTS_PREFIX }}
-        LIBCXX_BOOTSTRAP: true
-    - name: build
+        VALICC: $[[ TOOLCHAIN_PREFIX ]]/usr/local
+        VALI_ARCH: $[[ CHEF_TARGET_ARCHITECTURE ]]
+        VALI_SDK_PATH: $[[ BUILD_INGREDIENTS_PREFIX ]]
+        VALI_RUNTIME_PATH: $[[ INSTALL_PREFIX ]]
+    - name: build llvm
       type: build
       depends: [config]
       system: make
       env:
-        VALI_SDK_PATH: ${{ INGREDIENTS_PREFIX }}
+        VALICC: $[[ TOOLCHAIN_PREFIX ]]/usr/local
+        VALI_SDK_PATH: $[[ BUILD_INGREDIENTS_PREFIX ]]
 
 packs:
 - name: sdk-cpp

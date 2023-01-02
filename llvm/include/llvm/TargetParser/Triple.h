@@ -705,6 +705,11 @@ public:
     return getObjectFormat() == Triple::XCOFF;
   }
 
+  /// Tests whether the OS uses the VPE binary format.
+  bool isOSBinFormatVPE() const {
+    return getObjectFormat() == Triple::VPE;
+  }
+
   /// Tests whether the OS uses the DXContainer binary format.
   bool isOSBinFormatDXContainer() const {
     return getObjectFormat() == Triple::DXContainer;

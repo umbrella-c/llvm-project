@@ -255,7 +255,7 @@
 #include <memory>
 #include <type_traits>
 
-#ifndef _WIN32_WCE
+#if !defined(_WIN32_WCE) && !defined(MOLLENOS)
 # include <sys/types.h>
 # include <sys/stat.h>
 #endif  // !_WIN32_WCE
@@ -348,6 +348,10 @@ typedef struct _CRITICAL_SECTION GTEST_CRITICAL_SECTION;
 // WindowsTypesTest.CRITICAL_SECTIONIs_RTL_CRITICAL_SECTION.
 typedef struct _RTL_CRITICAL_SECTION GTEST_CRITICAL_SECTION;
 #endif
+#elif GTEST_OS_VALI
+# include <os/mollenos.h>
+# include <strings.h>
+# include <io.h>
 #else
 // This assumes that non-Windows OSes provide unistd.h. For OSes where this
 // is not the case, we need to include headers that provide the functions
@@ -368,7 +372,7 @@ typedef struct _RTL_CRITICAL_SECTION GTEST_CRITICAL_SECTION;
 // On Android, <regex.h> is only available starting with Gingerbread.
 #  define GTEST_HAS_POSIX_RE (__ANDROID_API__ >= 9)
 # else
-#  define GTEST_HAS_POSIX_RE (!GTEST_OS_WINDOWS)
+#  define GTEST_HAS_POSIX_RE (!GTEST_OS_WINDOWS) && (!GTEST_OS_VALI)
 # endif
 #endif
 
@@ -1997,6 +2001,29 @@ inline bool IsDir(const StatStruct& st) {
 }
 # endif  // GTEST_OS_WINDOWS_MOBILE
 
+#elif GTEST_OS_VALI
+
+typedef OsFileDescriptor_t StatStruct;
+
+inline int IsATTY(int fd) { return isatty(fd); }
+inline int FileNo(FILE* file) { return fileno(file); }
+inline int Stat(const char* path, StatStruct* buf) { return GetFileInformationFromPath(path, buf) == FsOk ? 0 : -1; }
+inline int StrCaseCmp(const char* s1, const char* s2) { return strcasecmp(s1, s2); }
+inline char* StrDup(const char* src) { return strdup(src); }
+
+inline int ChDir(const char* dir) { return SetWorkingDirectory(dir) == OsSuccess ? 0 : -1; }
+inline int RmDir(const char* dir) { return remove(dir); }
+inline bool IsDir(const StatStruct& st) { return (st.Flags & FILE_FLAG_DIRECTORY) != 0; }
+
+inline int Read(int fd, void* buf, unsigned int count) {
+  return static_cast<int>(read(fd, buf, count));
+}
+inline int Write(int fd, const void* buf, unsigned int count) {
+  return static_cast<int>(write(fd, const_cast<void*>(buf), count));
+}
+inline int Close(int fd) { return close(fd); }
+inline const char* StrError(int errnum) { return strerror(errnum); }
+
 #else
 
 typedef struct stat StatStruct;
@@ -2025,7 +2052,7 @@ inline const char* StrNCpy(char* dest, const char* src, size_t n) {
 // StrError() aren't needed on Windows CE at this time and thus not
 // defined there.
 
-#if !GTEST_OS_WINDOWS_MOBILE && !GTEST_OS_WINDOWS_PHONE && !GTEST_OS_WINDOWS_RT
+#if !GTEST_OS_WINDOWS_MOBILE && !GTEST_OS_WINDOWS_PHONE && !GTEST_OS_WINDOWS_RT && !GTEST_OS_VALI
 inline int ChDir(const char* dir) { return chdir(dir); }
 #endif
 inline FILE* FOpen(const char* path, const char* mode) {
@@ -2038,7 +2065,7 @@ inline FILE *FReopen(const char* path, const char* mode, FILE* stream) {
 inline FILE* FDOpen(int fd, const char* mode) { return fdopen(fd, mode); }
 #endif
 inline int FClose(FILE* fp) { return fclose(fp); }
-#if !GTEST_OS_WINDOWS_MOBILE
+#if !GTEST_OS_WINDOWS_MOBILE && !GTEST_OS_VALI
 inline int Read(int fd, void* buf, unsigned int count) {
   return static_cast<int>(read(fd, buf, count));
 }

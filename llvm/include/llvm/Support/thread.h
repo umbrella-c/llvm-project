@@ -31,7 +31,7 @@ typedef PVOID HANDLE;
 
 namespace llvm {
 
-#if LLVM_ON_UNIX || _WIN32
+#if LLVM_ON_UNIX || _WIN32 || LLVM_ON_VALI
 
 /// LLVM thread following std::thread interface with added constructor to
 /// specify stack size.
@@ -69,6 +69,15 @@ public:
   static unsigned __stdcall ThreadProxy(void *Ptr) {
     GenericThreadProxy<CalleeTuple>(Ptr);
     return 0;
+  }
+#elif LLVM_ON_VALI
+  using native_handle_type = thrd_t;
+  using id = thrd_t;
+  using start_routine_type = void *(*)(void *);
+
+  template <typename CalleeTuple> static void *ThreadProxy(void *Ptr) {
+    GenericThreadProxy<CalleeTuple>(Ptr);
+    return nullptr;
   }
 #endif
 
@@ -157,7 +166,7 @@ namespace this_thread {
 inline thread::id get_id() { return llvm_thread_get_current_id_impl(); }
 } // namespace this_thread
 
-#else // !LLVM_ON_UNIX && !_WIN32
+#else // !LLVM_ON_UNIX && !_WIN32 && !LLVM_ON_VALI
 
 /// std::thread backed implementation of llvm::thread interface that ignores the
 /// stack size request.
@@ -210,7 +219,7 @@ namespace this_thread {
   inline thread::id get_id() { return std::this_thread::get_id(); }
 }
 
-#endif // LLVM_ON_UNIX || _WIN32
+#endif // LLVM_ON_UNIX || _WIN32 || LLVM_ON_VALI
 
 } // namespace llvm
 

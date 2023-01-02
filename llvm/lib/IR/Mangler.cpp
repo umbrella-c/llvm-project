@@ -278,3 +278,24 @@ void llvm::emitLinkerFlagsForUsedCOFF(raw_ostream &OS, const GlobalValue *GV,
     OS << "\"";
 }
 
+void llvm::emitLinkerFlagsForGlobalVPE(raw_ostream &OS, const GlobalValue *GV,
+                                       const Triple &TT, Mangler &Mangler) {
+  if (!GV->hasDLLExportStorageClass() || GV->isDeclaration())
+    return;
+
+  OS << " -export:";
+
+  bool NeedQuotes = GV->hasName() && !canBeUnquotedInDirective(GV->getName());
+  if (NeedQuotes)
+    OS << "\"";
+  Mangler.getNameWithPrefix(OS, GV, false);
+  if (NeedQuotes)
+    OS << "\"";
+
+  if (!GV->getValueType()->isFunctionTy()) {
+    OS << ",data";
+  }
+}
+
+void llvm::emitLinkerFlagsForUsedVPE(raw_ostream &OS, const GlobalValue *GV,
+                                      const Triple &T, Mangler &M) { }

@@ -2161,6 +2161,11 @@ def fcxx_abi_EQ : Joined<["-"], "fc++-abi=">,
                   Group<f_clang_Group>, Flags<[CC1Option]>,
                   HelpText<"C++ ABI to use. This will override the target C++ ABI.">;
 
+def fstatic_runtime_cxx : Flag<["-"], "fstatic-runtime-cxx">, 
+                          Group<f_clang_Group>, Flags<[CC1Option, NoArgumentUnused]>,
+                          HelpText<"Generate static c++ runtime calls. This is neccessary on the Vali platforms for static c++ runtime.">,
+                          MarshallingInfoFlag<LangOpts<"StaticRuntimeCXX">>;
+
 def flat__namespace : Flag<["-"], "flat_namespace">;
 def flax_vector_conversions_EQ : Joined<["-"], "flax-vector-conversions=">, Group<f_Group>,
   HelpText<"Enable implicit vector bit-casts">, Values<"none,integer,all">, Flags<[CC1Option]>,

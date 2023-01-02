@@ -432,6 +432,8 @@ static MCAsmInfo *createX86MCAsmInfo(const MCRegisterInfo &MRI,
   } else if (TheTriple.isOSBinFormatELF()) {
     // Force the use of an ELF container.
     MAI = new X86ELFMCAsmInfo(TheTriple);
+  } else if (TheTriple.isOSBinFormatVPE()) {
+    MAI = new X86VPEMCAsmInfo(TheTriple);
   } else if (TheTriple.isWindowsMSVCEnvironment() ||
              TheTriple.isWindowsCoreCLREnvironment()) {
     if (Options.getAssemblyLanguage().equals_insensitive("masm"))
@@ -726,6 +728,8 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeX86TargetMC() {
     TargetRegistry::RegisterNullTargetStreamer(*T, createX86NullTargetStreamer);
 
     TargetRegistry::RegisterCOFFStreamer(*T, createX86WinCOFFStreamer);
+
+    TargetRegistry::RegisterVPEStreamer(*T, createX86VPEStreamer);
 
     // Register the MCInstPrinter.
     TargetRegistry::RegisterMCInstPrinter(*T, createX86MCInstPrinter);

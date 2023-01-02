@@ -89,6 +89,7 @@ bool TargetMachine::shouldAssumeDSOLocal(const Module &M,
                                          const GlobalValue *GV) const {
   const Triple &TT = getTargetTriple();
   Reloc::Model RM = getRelocationModel();
+  bool IsVPEOrCOFF = TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE();
 
   // According to the llvm language reference, we should be able to
   // just return false in here if we have a GV, as we know it is
@@ -105,17 +106,18 @@ bool TargetMachine::shouldAssumeDSOLocal(const Module &M,
   if (GV->isDSOLocal())
     return true;
 
-  if (TT.isOSBinFormatCOFF()) {
+  if (IsVPEOrCOFF) {
     // DLLImport explicitly marks the GV as external.
     if (GV->hasDLLImportStorageClass())
       return false;
 
-    // On MinGW, variables that haven't been declared with DLLImport may still
+    // On MinGW and Vali, variables that haven't been declared with DLLImport may still
     // end up automatically imported by the linker. To make this feasible,
     // don't assume the variables to be DSO local unless we actually know
     // that for sure. This only has to be done for variables; for functions
     // the linker can insert thunks for calling functions from another DLL.
-    if (TT.isWindowsGNUEnvironment() && GV->isDeclarationForLinker() &&
+    auto IsMinGWCOFFOrVali = TT.isWindowsGNUEnvironment() || TT.isOSVali();
+    if (IsMinGWCOFFOrVali && GV->isDeclarationForLinker() &&
         isa<GlobalVariable>(GV))
       return false;
 

@@ -426,7 +426,7 @@ static void initialize(TargetLibraryInfoImpl &TLI, const Triple &T,
     TLI.setUnavailable(LibFunc_write);
   }
 
-  if (T.isOSWindows() && !T.isWindowsCygwinEnvironment()) {
+  if ((T.isOSWindows() || T.isOSVali()) && !T.isWindowsCygwinEnvironment()) {
     // These functions aren't available in either MSVC or MinGW environments.
     TLI.setUnavailable(LibFunc_bcmp);
     TLI.setUnavailable(LibFunc_bcopy);

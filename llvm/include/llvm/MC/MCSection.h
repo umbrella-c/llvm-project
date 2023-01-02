@@ -47,6 +47,7 @@ public:
     SV_MachO,
     SV_Wasm,
     SV_XCOFF,
+    SV_VPE,
     SV_SPIRV,
     SV_DXContainer,
   };

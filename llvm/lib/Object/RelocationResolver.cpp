@@ -747,7 +747,7 @@ static uint64_t resolveWasm64(uint64_t Type, uint64_t Offset, uint64_t S,
 
 std::pair<SupportsRelocation, RelocationResolver>
 getRelocationResolver(const ObjectFile &Obj) {
-  if (Obj.isCOFF()) {
+  if (Obj.isCOFF() || Obj.isVPE()) {
     switch (Obj.getArch()) {
     case Triple::x86_64:
       return {supportsCOFFX86_64, resolveCOFFX86_64};

@@ -26,7 +26,11 @@
 #include <algorithm>
 #include <cerrno>
 #include <cstdio>
+#include <iterator>
+
+#ifndef MOLLENOS
 #include <sys/stat.h>
+#endif
 
 // <fcntl.h> may provide O_BINARY.
 #if defined(HAVE_FCNTL_H)
@@ -57,6 +61,11 @@
 #ifdef _WIN32
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Windows/WindowsSupport.h"
+#endif
+
+#ifdef MOLLENOS
+#include <stdio.h>
+#include <io.h>
 #endif
 
 using namespace llvm;
@@ -757,7 +766,11 @@ void raw_fd_ostream::write_impl(const char *Ptr, size_t Size) {
 
   do {
     size_t ChunkSize = std::min(Size, MaxWriteSize);
+#if defined(LLVM_ON_VALI)
+    ssize_t ret = ::write(FD, (void*)Ptr, ChunkSize);
+#else
     ssize_t ret = ::write(FD, Ptr, ChunkSize);
+#endif
 
     if (ret < 0) {
       // If it's a recoverable error, swallow it and retry the write.
@@ -802,6 +815,8 @@ uint64_t raw_fd_ostream::seek(uint64_t off) {
   flush();
 #ifdef _WIN32
   pos = ::_lseeki64(FD, off, SEEK_SET);
+#elif defined(LLVM_ON_VALI)
+  pos = ::lseeki64(FD, off, SEEK_SET);
 #elif defined(HAVE_LSEEK64)
   pos = ::lseek64(FD, off, SEEK_SET);
 #else
@@ -830,7 +845,7 @@ size_t raw_fd_ostream::preferred_buffer_size() const {
   if (IsWindowsConsole)
     return 0;
   return raw_ostream::preferred_buffer_size();
-#elif !defined(__minix)
+#elif !defined(__minix) && !defined(MOLLENOS)
   // Minix has no st_blksize.
   assert(FD >= 0 && "File not yet open!");
   struct stat statbuf;

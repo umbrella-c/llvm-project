@@ -7161,7 +7161,7 @@ static bool checkVAStartABI(Sema &S, unsigned BuiltinID, Expr *Fn) {
   bool IsX64 = TT.getArch() == llvm::Triple::x86_64;
   bool IsAArch64 = (TT.getArch() == llvm::Triple::aarch64 ||
                     TT.getArch() == llvm::Triple::aarch64_32);
-  bool IsWindows = TT.isOSWindows();
+  bool IsWindows = TT.isOSWindows() || TT.isOSVali();
   bool IsMSVAStart = BuiltinID == Builtin::BI__builtin_ms_va_start;
   if (IsX64 || IsAArch64) {
     CallingConv CC = CC_C;

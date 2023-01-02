@@ -72,7 +72,7 @@ DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_x86_64_jumpto)
 #
 # extern "C" void __libunwind_Registers_x86_64_jumpto(Registers_x86_64 *);
 #
-#if defined(_WIN64)
+#if defined(_WIN64) || defined(MOLLENOS)
 # On entry, thread_state pointer is in rcx; move it into rdi
 # to share restore code below. Since this routine restores and
 # overwrites all registers, we can use the same registers for
@@ -113,7 +113,7 @@ DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_x86_64_jumpto)
   # skip fs
   # skip gs
 
-#if defined(_WIN64)
+#if defined(_WIN64) || defined(MOLLENOS)
   movdqu 176(%rdi),%xmm0
   movdqu 192(%rdi),%xmm1
   movdqu 208(%rdi),%xmm2

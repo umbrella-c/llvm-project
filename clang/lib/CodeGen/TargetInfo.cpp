@@ -2737,21 +2737,71 @@ public:
     AssignToArrayRange(CGF.Builder, Address, Eight8, 0, 16);
     return false;
   }
-
-  void getDependentLibraryOption(llvm::StringRef Lib,
-                                 llvm::SmallString<24> &Opt) const override {
-    Opt = "/DEFAULTLIB:";
-    Opt += qualifyWindowsLibrary(Lib);
-  }
-
-  void getDetectMismatchOption(llvm::StringRef Name,
-                               llvm::StringRef Value,
-                               llvm::SmallString<32> &Opt) const override {
-    Opt = "/FAILIFMISMATCH:\"" + Name.str() + "=" + Value.str() + "\"";
-  }
 };
 
 void WinX86_64TargetCodeGenInfo::setTargetAttributes(
+    const Decl *D, llvm::GlobalValue *GV, CodeGen::CodeGenModule &CGM) const {
+  TargetCodeGenInfo::setTargetAttributes(D, GV, CGM);
+  if (GV->isDeclaration())
+    return;
+  if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
+    if (FD->hasAttr<X86ForceAlignArgPointerAttr>()) {
+      llvm::Function *Fn = cast<llvm::Function>(GV);
+      Fn->addFnAttr("stackrealign");
+    }
+
+    addX86InterruptAttrs(FD, GV, CGM);
+  }
+
+  addStackProbeTargetAttributes(D, GV, CGM);
+}
+
+// VALI
+class ValiX86_32TargetCodeGenInfo : public X86_32TargetCodeGenInfo {
+public:
+  ValiX86_32TargetCodeGenInfo(CodeGen::CodeGenTypes &CGT,
+        bool DarwinVectorABI, bool RetSmallStructInRegABI, bool Win32StructABI,
+        unsigned NumRegisterParameters)
+    : X86_32TargetCodeGenInfo(CGT, DarwinVectorABI, RetSmallStructInRegABI,
+        Win32StructABI, NumRegisterParameters, false) {}
+
+  void setTargetAttributes(const Decl *D, llvm::GlobalValue *GV,
+                           CodeGen::CodeGenModule &CGM) const override;
+};
+
+void ValiX86_32TargetCodeGenInfo::setTargetAttributes(
+    const Decl *D, llvm::GlobalValue *GV, CodeGen::CodeGenModule &CGM) const {
+  X86_32TargetCodeGenInfo::setTargetAttributes(D, GV, CGM);
+  if (GV->isDeclaration())
+    return;
+  addStackProbeTargetAttributes(D, GV, CGM);
+}
+
+class ValiX86_64TargetCodeGenInfo : public TargetCodeGenInfo {
+public:
+  ValiX86_64TargetCodeGenInfo(CodeGen::CodeGenTypes &CGT,
+                             X86AVXABILevel AVXLevel)
+      : TargetCodeGenInfo(std::make_unique<WinX86_64ABIInfo>(CGT, AVXLevel)) {}
+
+  void setTargetAttributes(const Decl *D, llvm::GlobalValue *GV,
+                           CodeGen::CodeGenModule &CGM) const override;
+
+  int getDwarfEHStackPointer(CodeGen::CodeGenModule &CGM) const override {
+    return 7;
+  }
+
+  bool initDwarfEHRegSizeTable(CodeGen::CodeGenFunction &CGF,
+                               llvm::Value *Address) const override {
+    llvm::Value *Eight8 = llvm::ConstantInt::get(CGF.Int8Ty, 8);
+
+    // 0-15 are the 16 integer registers.
+    // 16 is %rip.
+    AssignToArrayRange(CGF.Builder, Address, Eight8, 0, 16);
+    return false;
+  }
+};
+
+void ValiX86_64TargetCodeGenInfo::setTargetAttributes(
     const Decl *D, llvm::GlobalValue *GV, CodeGen::CodeGenModule &CGM) const {
   TargetCodeGenInfo::setTargetAttributes(D, GV, CGM);
   if (GV->isDeclaration())
@@ -12327,6 +12377,10 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
       return SetCGInfo(new WinX86_32TargetCodeGenInfo(
           Types, IsDarwinVectorABI, RetSmallStructInRegABI,
           IsWin32FloatStructABI, CodeGenOpts.NumRegisterParameters));
+    } else if (Triple.getOS() == llvm::Triple::Vali) {
+      return SetCGInfo(new ValiX86_32TargetCodeGenInfo(
+          Types, IsDarwinVectorABI, RetSmallStructInRegABI,
+          /*IsWin32FloatStructABI=*/ true, CodeGenOpts.NumRegisterParameters));
     } else {
       return SetCGInfo(new X86_32TargetCodeGenInfo(
           Types, IsDarwinVectorABI, RetSmallStructInRegABI,
@@ -12345,6 +12399,8 @@ const TargetCodeGenInfo &CodeGenModule::getTargetCodeGenInfo() {
     switch (Triple.getOS()) {
     case llvm::Triple::Win32:
       return SetCGInfo(new WinX86_64TargetCodeGenInfo(Types, AVXLevel));
+    case llvm::Triple::Vali:
+      return SetCGInfo(new ValiX86_64TargetCodeGenInfo(Types, AVXLevel));
     default:
       return SetCGInfo(new X86_64TargetCodeGenInfo(Types, AVXLevel));
     }

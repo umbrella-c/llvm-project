@@ -140,6 +140,10 @@ Globals &getGlobals() {
 
 #include "Windows/DynamicLibrary.inc"
 
+#elif defined(LLVM_ON_VALI)
+
+#include "Vali/DynamicLibrary.inc"
+
 #else
 
 #include "Unix/DynamicLibrary.inc"

@@ -1536,6 +1536,22 @@ template <typename PEHeaderTy> void Writer::writeHeader() {
                                 : sizeof(object::coff_tls_directory32);
     }
   }
+
+  // VPE Only - Store the Relocations in the GLOBAL_PTR so we can perform these relocations
+  // as a part of the image loading.
+  if (config->vpe) {
+    Symbol *relocSymStart = symtab->findUnderscore("__RUNTIME_PSEUDO_RELOC_LIST__");
+    Symbol *relocSymEnd = symtab->findUnderscore("__RUNTIME_PSEUDO_RELOC_LIST_END__");
+    if (relocSymStart && relocSymEnd) {
+      Defined *b = dyn_cast<Defined>(relocSymStart);
+      Defined *c = dyn_cast<Defined>(relocSymEnd);
+      if (b && c) {
+        dir[GLOBAL_PTR].RelativeVirtualAddress = b->getRVA();
+        dir[GLOBAL_PTR].Size = c->getRVA() - b->getRVA();
+      }
+    }
+  }
+
   if (debugDirectory) {
     dir[DEBUG_DIRECTORY].RelativeVirtualAddress = debugDirectory->getRVA();
     dir[DEBUG_DIRECTORY].Size = debugDirectory->getSize();

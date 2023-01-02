@@ -92,6 +92,7 @@
 #include "llvm/MC/MCSectionCOFF.h"
 #include "llvm/MC/MCSectionELF.h"
 #include "llvm/MC/MCSectionMachO.h"
+#include "llvm/MC/MCSectionVPE.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCSymbol.h"
@@ -1745,6 +1746,7 @@ void AsmPrinter::emitFunctionBody() {
   // FIXME: Hide this behind some API in e.g. MCAsmInfo or MCTargetStreamer.
   const Triple &TT = TM.getTargetTriple();
   if (!HasAnyRealCode && (MAI->hasSubsectionsViaSymbols() ||
+                          TT.isOSBinFormatVPE() ||
                           (TT.isOSWindows() && TT.isOSBinFormatCOFF()))) {
     MCInst Noop = MF->getSubtarget().getInstrInfo()->getNop();
 
@@ -2146,6 +2148,33 @@ bool AsmPrinter::doFinalization(Module &M) {
         SmallString<256> SectionName = StringRef(".rdata$");
         SectionName += Stub.first->getName();
         OutStreamer->switchSection(OutContext.getCOFFSection(
+            SectionName,
+            COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ |
+                COFF::IMAGE_SCN_LNK_COMDAT,
+            SectionKind::getReadOnly(), Stub.first->getName(),
+            COFF::IMAGE_COMDAT_SELECT_ANY));
+        emitAlignment(Align(DL.getPointerSize()));
+        OutStreamer->emitSymbolAttribute(Stub.first, MCSA_Global);
+        OutStreamer->emitLabel(Stub.first);
+        OutStreamer->emitSymbolValue(Stub.second.getPointer(),
+                                     DL.getPointerSize());
+      }
+    }
+  }
+
+  if (TM.getTargetTriple().isOSBinFormatVPE()) {
+    MachineModuleInfoVPE &MMIVPE =
+        MMI->getObjFileInfo<MachineModuleInfoVPE>();
+
+    // Output stubs for external and common global variables.
+    MachineModuleInfoVPE::SymbolListTy Stubs = MMIVPE.GetGVStubList();
+    if (!Stubs.empty()) {
+      const DataLayout &DL = M.getDataLayout();
+
+      for (const auto &Stub : Stubs) {
+        SmallString<256> SectionName = StringRef(".rdata$");
+        SectionName += Stub.first->getName();
+        OutStreamer->SwitchSection(OutContext.getVPESection(
             SectionName,
             COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ |
                 COFF::IMAGE_SCN_LNK_COMDAT,

@@ -264,7 +264,8 @@ EPCIndirectionUtils::Create(ExecutorProcessControl &EPC) {
     return CreateWithABI<OrcRiscv64>(EPC);
 
   case Triple::x86_64:
-    if (TT.getOS() == Triple::OSType::Win32)
+    if (TT.getOS() == Triple::OSType::Win32 ||
+        TT.getOS() == Triple::OSType::Vali)
       return CreateWithABI<OrcX86_64_Win32>(EPC);
     else
       return CreateWithABI<OrcX86_64_SysV>(EPC);

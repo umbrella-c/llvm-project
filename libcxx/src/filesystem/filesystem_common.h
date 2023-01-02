@@ -21,7 +21,7 @@
 #include <system_error>
 #include <utility>
 
-#if defined(_LIBCPP_WIN32API)
+#if defined(_LIBCPP_WIN32API) && !defined(__MOLLENOS__)
 # define WIN32_LEAN_AND_MEAN
 # define NOMINMAX
 # include <windows.h>
@@ -275,6 +275,18 @@ struct StatT {
   uint32_t st_nlink;
   uintmax_t st_size;
 };
+#elif defined(__MOLLENOS__)
+using TimeSpec = struct timespec;
+
+struct StatT {
+  unsigned st_mode;
+  TimeSpec st_atim;
+  TimeSpec st_mtim;
+  uint64_t st_dev;
+  uint64_t st_ino;
+  uint32_t st_nlink;
+  uintmax_t st_size;
+};
 
 #else
 using TimeSpec = struct timespec;
@@ -489,7 +501,7 @@ inline TimeSpec extract_mtime(StatT const& st) { return st.st_mtim; }
 inline TimeSpec extract_atime(StatT const& st) { return st.st_atim; }
 #endif
 
-#if !defined(_LIBCPP_WIN32API)
+#if !defined(_LIBCPP_WIN32API) && !defined(__MOLLENOS__)
 inline TimeVal make_timeval(TimeSpec const& ts) {
   using namespace chrono;
   auto Convert = [](long nsec) {

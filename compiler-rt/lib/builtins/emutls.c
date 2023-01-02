@@ -45,7 +45,7 @@ typedef struct emutls_address_array {
 
 static void emutls_shutdown(emutls_address_array *array);
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(MOLLENOS)
 
 #include <pthread.h>
 
@@ -129,6 +129,58 @@ static __inline void emutls_lock(void) { pthread_mutex_lock(&emutls_mutex); }
 
 static __inline void emutls_unlock(void) { pthread_mutex_unlock(&emutls_mutex); }
 
+#elif defined(MOLLENOS)
+#include <threads.h>
+
+static mtx_t emutls_mutex = MUTEX_INIT(mtx_plain);
+static tss_t emutls_pthread_key = TSS_KEY_INVALID;
+
+typedef unsigned int gcc_word __attribute__((mode(word)));
+typedef unsigned int gcc_pointer __attribute__((mode(pointer)));
+
+static __inline void *emutls_memalign_alloc(size_t align, size_t size) {
+    void *base;
+    if ((base = aligned_alloc(align, size)) == NULL) {
+        abort();
+    }
+    return base;
+}
+
+static __inline void emutls_memalign_free(void *base) {
+    free(base);
+}
+
+static void emutls_key_destructor(void* ptr) {
+    emutls_shutdown((emutls_address_array*)ptr);
+    free(ptr);
+}
+
+static __inline void emutls_init(void) {
+    if (tss_create(&emutls_pthread_key, emutls_key_destructor) != OsSuccess) {
+        abort();
+    }
+}
+
+static __inline void emutls_init_once(void) {
+    static once_flag once = ONCE_FLAG_INIT;
+    call_once(&once, emutls_init);
+}
+
+static __inline void emutls_lock() {
+    mtx_lock(&emutls_mutex);
+}
+
+static __inline void emutls_unlock() {
+    mtx_unlock(&emutls_mutex);
+}
+
+static __inline void emutls_setspecific(emutls_address_array *value) {
+    tss_set(emutls_pthread_key, (void*)value);
+}
+
+static __inline emutls_address_array* emutls_getspecific() {
+    return (emutls_address_array*)tss_get(emutls_pthread_key);
+}
 #else // _WIN32
 
 #include <assert.h>

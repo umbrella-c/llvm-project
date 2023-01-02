@@ -41,9 +41,11 @@ typedef enum {
   LLVMBinaryTypeArchive,              /**< Archive file. */
   LLVMBinaryTypeMachOUniversalBinary, /**< Mach-O Universal Binary file. */
   LLVMBinaryTypeCOFFImportFile,       /**< COFF Import file. */
+  LLVMBinaryTypeVPEImportFile,        /**< VPE Import file. */
   LLVMBinaryTypeIR,                   /**< LLVM IR. */
   LLVMBinaryTypeWinRes,               /**< Windows resource (.res) file. */
   LLVMBinaryTypeCOFF,                 /**< COFF Object file. */
+  LLVMBinaryTypeVPE,                  /**< VPE Object file. */
   LLVMBinaryTypeELF32L,               /**< ELF 32-bit, little endian. */
   LLVMBinaryTypeELF32B,               /**< ELF 32-bit, big endian. */
   LLVMBinaryTypeELF64L,               /**< ELF 64-bit, little endian. */
@@ -54,7 +56,6 @@ typedef enum {
   LLVMBinaryTypeMachO64B,             /**< MachO 64-bit, big endian. */
   LLVMBinaryTypeWasm,                 /**< Web Assembly. */
   LLVMBinaryTypeOffload,              /**< Offloading fatbinary. */
-
 } LLVMBinaryType;
 
 /**

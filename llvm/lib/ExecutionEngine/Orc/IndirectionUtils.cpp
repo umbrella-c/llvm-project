@@ -158,7 +158,8 @@ createLocalCompileCallbackManager(const Triple &T, ExecutionSession &ES,
     }
 
     case Triple::x86_64: {
-      if (T.getOS() == Triple::OSType::Win32) {
+      if (T.getOS() == Triple::OSType::Win32 ||
+          T.getOS() == Triple::OSType::Vali) {
         typedef orc::LocalJITCompileCallbackManager<orc::OrcX86_64_Win32> CCMgrT;
         return CCMgrT::Create(ES, ErrorHandlerAddress);
       } else {
@@ -218,7 +219,7 @@ createLocalIndirectStubsManagerBuilder(const Triple &T) {
       };
 
     case Triple::x86_64:
-      if (T.getOS() == Triple::OSType::Win32) {
+      if (T.getOS() == Triple::OSType::Win32 || T.getOS() == Triple::OSType::Vali) {
         return [](){
           return std::make_unique<
                      orc::LocalIndirectStubsManager<orc::OrcX86_64_Win32>>();

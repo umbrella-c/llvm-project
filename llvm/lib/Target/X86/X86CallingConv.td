@@ -17,6 +17,12 @@ class CCIfSubtarget<string F, CCAction A>
                        "(State.getMachineFunction().getSubtarget()).", F),
            A>;
 
+/// CCIfWin64OrVali64 - Match if the current subtarget doesn't has a feature F.
+class CCIfWin64OrVali64<CCAction A>
+    : CCIfSubtarget<"isTargetWin64() || static_cast<const X86Subtarget&>"
+                    "(State.getMachineFunction().getSubtarget()).isTargetVali64()",
+           A>;
+
 /// CCIfNotSubtarget - Match if the current subtarget doesn't has a feature F.
 class CCIfNotSubtarget<string F, CCAction A>
     : CCIf<!strconcat("!static_cast<const X86Subtarget&>"
@@ -28,6 +34,12 @@ class CCIfIsVarArgOnWin<CCAction A>
     : CCIf<"State.isVarArg() && "
            "State.getMachineFunction().getSubtarget().getTargetTriple()."
            "isWindowsMSVCEnvironment()",
+           A>;
+
+/// CCIfNotWin64OrVali64 - Match if Win64 or Vali64 doesn't has a feature F.
+class CCIfNotWin64OrVali64<CCAction A>
+    : CCIfNotSubtarget<"isTargetWin64() && !static_cast<const X86Subtarget&>"
+                       "(State.getMachineFunction().getSubtarget()).isTargetVali64()",
            A>;
 
 // Register classes for RegCall
@@ -261,7 +273,7 @@ def RetCC_X86Common : CallingConv<[
 
   // Long double types are always returned in FP0 (even with SSE),
   // except on Win64.
-  CCIfNotSubtarget<"isTargetWin64()", CCIfType<[f80], CCAssignToReg<[FP0, FP1]>>>
+  CCIfNotWin64OrVali64<CCIfType<[f80], CCAssignToReg<[FP0, FP1]>>>
 ]>;
 
 // X86-32 C return-value convention.
@@ -487,12 +499,11 @@ def RetCC_X86_64 : CallingConv<[
   CCIfCC<"CallingConv::HHVM", CCDelegateTo<RetCC_X86_64_HHVM>>,
 
   CCIfCC<"CallingConv::X86_RegCall",
-          CCIfSubtarget<"isTargetWin64()",
-                        CCDelegateTo<RetCC_X86_Win64_RegCall>>>,
+          CCIfWin64OrVali64<CCDelegateTo<RetCC_X86_Win64_RegCall>>>,
   CCIfCC<"CallingConv::X86_RegCall", CCDelegateTo<RetCC_X86_SysV64_RegCall>>,
           
-  // Mingw64 and native Win64 use Win64 CC
-  CCIfSubtarget<"isTargetWin64()", CCDelegateTo<RetCC_X86_Win64_C>>,
+  // Mingw64, Vali64 and native Win64 use Win64 CC
+  CCIfWin64OrVali64<CCDelegateTo<RetCC_X86_Win64_C>>,
 
   // Otherwise, drop to normal X86-64 CC
   CCDelegateTo<RetCC_X86_64_C>
@@ -620,7 +631,7 @@ def CC_X86_64_HHVM_C : CallingConv<[
   CCDelegateTo<CC_X86_64_C>
 ]>;
 
-// Calling convention used on Win64
+// Calling convention used on Win64 and Vali
 def CC_X86_Win64_C : CallingConv<[
   // FIXME: Handle varargs.
 
@@ -1036,8 +1047,8 @@ def CC_X86_32_HiPE : CallingConv<[
 // X86-64 Intel OpenCL built-ins calling convention.
 def CC_Intel_OCL_BI : CallingConv<[
 
-  CCIfType<[i32], CCIfSubtarget<"isTargetWin64()", CCAssignToReg<[ECX, EDX, R8D, R9D]>>>,
-  CCIfType<[i64], CCIfSubtarget<"isTargetWin64()", CCAssignToReg<[RCX, RDX, R8,  R9 ]>>>,
+  CCIfType<[i32], CCIfWin64OrVali64<CCAssignToReg<[ECX, EDX, R8D, R9D]>>>,
+  CCIfType<[i64], CCIfWin64OrVali64<CCAssignToReg<[RCX, RDX, R8,  R9 ]>>>,
 
   CCIfType<[i32], CCIfSubtarget<"is64Bit()", CCAssignToReg<[EDI, ESI, EDX, ECX]>>>,
   CCIfType<[i64], CCIfSubtarget<"is64Bit()", CCAssignToReg<[RDI, RSI, RDX, RCX]>>>,
@@ -1059,8 +1070,8 @@ def CC_Intel_OCL_BI : CallingConv<[
   // Pass masks in mask registers
   CCIfType<[v16i1, v8i1], CCAssignToReg<[K1]>>,
 
-  CCIfSubtarget<"isTargetWin64()", CCDelegateTo<CC_X86_Win64_C>>,
-  CCIfSubtarget<"is64Bit()",       CCDelegateTo<CC_X86_64_C>>,
+  CCIfWin64OrVali64<         CCDelegateTo<CC_X86_Win64_C>>,
+  CCIfSubtarget<"is64Bit()", CCDelegateTo<CC_X86_64_C>>,
   CCDelegateTo<CC_X86_32_C>
 ]>;
 
@@ -1099,13 +1110,12 @@ def CC_X86_64 : CallingConv<[
   CCIfCC<"CallingConv::X86_VectorCall", CCDelegateTo<CC_X86_Win64_VectorCall>>,
   CCIfCC<"CallingConv::HHVM", CCDelegateTo<CC_X86_64_HHVM>>,
   CCIfCC<"CallingConv::HHVM_C", CCDelegateTo<CC_X86_64_HHVM_C>>,
-  CCIfCC<"CallingConv::X86_RegCall",
-    CCIfSubtarget<"isTargetWin64()", CCDelegateTo<CC_X86_Win64_RegCall>>>,
+  CCIfCC<"CallingConv::X86_RegCall", CCIfWin64OrVali64<CCDelegateTo<CC_X86_Win64_RegCall>>>,
   CCIfCC<"CallingConv::X86_RegCall", CCDelegateTo<CC_X86_SysV64_RegCall>>,
   CCIfCC<"CallingConv::X86_INTR", CCCustom<"CC_X86_Intr">>,
 
-  // Mingw64 and native Win64 use Win64 CC
-  CCIfSubtarget<"isTargetWin64()", CCDelegateTo<CC_X86_Win64_C>>,
+  // Mingw64, Vali64 and native Win64 use Win64 CC
+  CCIfWin64OrVali64<CCDelegateTo<CC_X86_Win64_C>>,
 
   // Otherwise, drop to normal X86-64 CC
   CCDelegateTo<CC_X86_64_C>

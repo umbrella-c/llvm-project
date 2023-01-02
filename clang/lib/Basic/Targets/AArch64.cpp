@@ -371,7 +371,7 @@ void AArch64TargetInfo::getTargetDefines(const LangOptions &Opts,
     Builder.defineMacro("__ELF__");
 
   // Target properties.
-  if (!getTriple().isOSWindows() && getTriple().isArch64Bit()) {
+  if (!getTriple().isOSWindows() && !getTriple().isOSVali() && getTriple().isArch64Bit()) {
     Builder.defineMacro("_LP64");
     Builder.defineMacro("__LP64__");
   }

@@ -126,7 +126,7 @@ namespace std  // purposefully not using versioning namespace
 struct _LIBCPP_TYPE_VIS nothrow_t { explicit nothrow_t() = default; };
 extern _LIBCPP_FUNC_VIS const nothrow_t nothrow;
 
-class _LIBCPP_EXCEPTION_ABI bad_alloc
+class _LIBCPPABI_TYPE_VIS bad_alloc
     : public exception
 {
 public:
@@ -135,7 +135,7 @@ public:
     const char* what() const _NOEXCEPT override;
 };
 
-class _LIBCPP_EXCEPTION_ABI bad_array_new_length
+class _LIBCPPABI_TYPE_VIS bad_array_new_length
     : public bad_alloc
 {
 public:

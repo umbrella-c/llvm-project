@@ -199,8 +199,9 @@ private:
 
 void AArch64AsmPrinter::emitStartOfAsmFile(Module &M) {
   const Triple &TT = TM.getTargetTriple();
+  bool IsVPEOrCOFF = TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE();
 
-  if (TT.isOSBinFormatCOFF()) {
+  if (IsVPEOrCOFF) {
     // Emit an absolute @feat.00 symbol
     MCSymbol *S = MMI->getContext().getOrCreateSymbol(StringRef("@feat.00"));
     OutStreamer->beginCOFFSymbolDef(S);

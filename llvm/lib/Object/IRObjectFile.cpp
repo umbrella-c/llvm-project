@@ -95,6 +95,7 @@ IRObjectFile::findBitcodeInMemBuffer(MemoryBufferRef Object) {
   case file_magic::elf_relocatable:
   case file_magic::macho_object:
   case file_magic::wasm_object:
+  case file_magic::vpe_object:
   case file_magic::coff_object: {
     Expected<std::unique_ptr<ObjectFile>> ObjFile =
         ObjectFile::createObjectFile(Object, Type);

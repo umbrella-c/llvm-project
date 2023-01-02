@@ -24,7 +24,7 @@
 #include "Registers.hpp"
 
 #ifndef _LIBUNWIND_USE_DLADDR
-  #if !(defined(_LIBUNWIND_IS_BAREMETAL) || defined(_WIN32) || defined(_AIX))
+  #if !(defined(_LIBUNWIND_IS_BAREMETAL) || defined(_WIN32) || defined(MOLLENOS) || defined(_AIX))
     #define _LIBUNWIND_USE_DLADDR 1
   #else
     #define _LIBUNWIND_USE_DLADDR 0
@@ -109,6 +109,10 @@ extern char __exidx_end;
 
 #include <windows.h>
 #include <psapi.h>
+
+#elif defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) && defined(MOLLENOS)
+
+#include <os/unwind.h>
 
 #elif defined(_LIBUNWIND_USE_DL_ITERATE_PHDR) ||                               \
       defined(_LIBUNWIND_USE_DL_UNWIND_FIND_EXIDX)
@@ -520,6 +524,15 @@ inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
                              (void *)info.arm_section, (void *)info.arm_section_length);
   if (info.arm_section && info.arm_section_length)
     return true;
+#elif defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) && defined(MOLLENOS)
+  UnwindSection_t section;
+  if (UnwindGetSection((void*)targetAddr, &section) == OsSuccess) {
+    info.dso_base             = (uintptr_t)section.ModuleBase;
+    info.dwarf_section        = (uintptr_t)section.UnwindSectionBase;
+    info.dwarf_section_length = section.UnwindSectionLength;
+    return true;
+  }
+  return false;
 #elif defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) && defined(_WIN32)
   HMODULE mods[1024];
   HANDLE process = GetCurrentProcess();

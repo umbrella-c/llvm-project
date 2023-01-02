@@ -163,7 +163,7 @@ bool CodeGenModule::TryEmitBaseDestructorAsAlias(const CXXDestructorDecl *D) {
   // reference from another TU. The other TU must also mark the referenced
   // symbol as weak, which we cannot rely on.
   if (llvm::GlobalValue::isWeakForLinker(Linkage) &&
-      getTriple().isOSBinFormatCOFF()) {
+      (getTriple().isOSBinFormatCOFF() || getTriple().isOSBinFormatVPE())) {
     return true;
   }
 

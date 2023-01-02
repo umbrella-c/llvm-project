@@ -48,7 +48,7 @@
 #include "llvm/ToolDrivers/llvm-dlltool/DlltoolDriver.h"
 #include "llvm/ToolDrivers/llvm-lib/LibDriver.h"
 
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(MOLLENOS)
 #include <unistd.h>
 #else
 #include <io.h>

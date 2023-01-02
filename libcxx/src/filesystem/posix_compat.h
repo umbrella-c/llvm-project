@@ -34,6 +34,9 @@
 # include <windows.h>
 # include <io.h>
 # include <winioctl.h>
+#elif defined(__MOLLENOS__)
+#include <os/mollenos.h>
+#include <io.h>
 #else
 # include <unistd.h>
 # include <sys/stat.h>
@@ -476,6 +479,182 @@ SSizeT readlink(const wchar_t *path, wchar_t *ret_buf, size_t bufsize) {
   memcpy(ret_buf, &symlink.PathBuffer[name_offset / sizeof(wchar_t)],
          name_length);
   return name_length / sizeof(wchar_t);
+}
+
+#elif defined(__MOLLENOS__)
+#define _S_IFMT   0xF000
+#define _S_IFDIR  0x4000
+#define _S_IFCHR  0x2000
+#define _S_IFIFO  0x1000
+#define _S_IFREG  0x8000
+#define _S_IFBLK  0x6000
+#define _S_IFLNK  0xA000
+#define _S_IFSOCK 0xC000
+#define S_ISDIR(m)      (((m) & _S_IFMT) == _S_IFDIR)
+#define S_ISCHR(m)      (((m) & _S_IFMT) == _S_IFCHR)
+#define S_ISFIFO(m)     (((m) & _S_IFMT) == _S_IFIFO)
+#define S_ISREG(m)      (((m) & _S_IFMT) == _S_IFREG)
+#define S_ISBLK(m)      (((m) & _S_IFMT) == _S_IFBLK)
+#define S_ISLNK(m)      (((m) & _S_IFMT) == _S_IFLNK)
+#define S_ISSOCK(m)     (((m) & _S_IFMT) == _S_IFSOCK)
+
+//#define AT_FDCWD 0
+//#define AT_SYMLINK_NOFOLLOW 0
+
+using SSizeT = ::int64_t;
+using ModeT = int;
+using ::close;
+using ::open;
+using ::remove;
+using ::rename;
+using ::mkdir;
+
+struct StatVFS {
+  uint64_t f_frsize;
+  uint64_t f_blocks;
+  uint64_t f_bfree;
+  uint64_t f_bavail;
+};
+
+void descriptor_to_stat(OsFileDescriptor_t* descriptor, struct StatT* buf)
+{
+  buf->st_atim = descriptor->AccessedAt;
+  buf->st_mtim = descriptor->ModifiedAt;
+  buf->st_mode = 0555; // Read-only
+  if (!(descriptor->Permissions & FILE_PERMISSION_WRITE))
+    buf->st_mode |= 0222; // Write
+  if (descriptor->Flags & FILE_FLAG_DIRECTORY) {
+    buf->st_mode |= _S_IFDIR;
+  } else {
+    buf->st_mode |= _S_IFREG;
+  }
+
+  buf->st_size = descriptor->Size.QuadPart;
+  buf->st_nlink = 1;
+  buf->st_dev = descriptor->StorageId;
+  buf->st_ino = descriptor->Id;
+}
+
+int symlink_file(const char *oldname, const char *newname) {
+  return ::link(oldname, newname, 1);
+}
+int symlink_dir(const char *oldname, const char *newname) {
+  return ::link(oldname, newname, 1);
+}
+
+int link(const char *oldname, const char *newname) {
+  return ::link(oldname, newname, 0);
+}
+
+int stat(const char *path, struct StatT* buf) {
+  OsFileDescriptor_t descriptor;
+  OsStatus_t         status = GetFileInformationFromPath(path, &descriptor);
+  if (status != OsSuccess) {
+    return OsStatusToErrno(status);
+  }
+  descriptor_to_stat(&descriptor, buf);
+  return 0;
+}
+
+int fstat(int fd, struct StatT *buf) {
+  OsFileDescriptor_t descriptor;
+  OsStatus_t         status = GetFileInformationFromFd(fd, &descriptor);
+  if (status != OsSuccess) {
+    return OsStatusToErrno(status);
+  }
+  descriptor_to_stat(&descriptor, buf);
+  return 0;
+}
+
+int lstat(const char *path, struct StatT *buf) {
+  // stat symbolic link itself, not the file it refers to
+  // @todo link control when statting paths
+  return stat(path, buf);
+}
+
+char* getcwd(char *buf, size_t size) {
+  char       tmp[_MAXPATH] = { 0 };
+  OsStatus_t status = GetWorkingDirectory(&tmp[0], _MAXPATH);
+  if (status != OsSuccess) {
+    OsStatusToErrno(status);
+    return NULL;
+  }
+  
+  if (buf && size < (strlen(&tmp[0]) + 1)) {
+    _set_errno(ERANGE);
+    return NULL;
+  }
+
+  if (!buf) {
+    buf = (char*)malloc(strlen(&tmp[0]) + 1);
+  }
+  memcpy(buf, &tmp[0], strlen(&tmp[0]) + 1);
+  return buf;
+}
+
+int chdir(const char *path) {
+  OsStatus_t status = SetWorkingDirectory(path);
+  return OsStatusToErrno(status);
+}
+
+int chmod(const char *path, int perms) {
+  OsStatus_t status;
+  int        access = FILE_PERMISSION_READ;
+
+  if (perms & 0222)
+    access |= FILE_PERMISSION_WRITE;
+
+  status = ChangeFilePermissionsFromPath(path, access);
+  return OsStatusToErrno(status);
+}
+
+int fchmod(int fd, int perms) {
+  OsStatus_t status;
+  int        access = FILE_PERMISSION_READ;
+
+  if (perms & 0222)
+    access |= FILE_PERMISSION_WRITE;
+
+  status = ChangeFilePermissionsFromFd(fd, access);
+  return OsStatusToErrno(status);
+}
+
+int ftruncate(int fd, SSizeT length) {
+  OsStatus_t status = SetFileSizeFromFd(fd, length);
+  return OsStatusToErrno(status);
+}
+
+int truncate(const char *path, SSizeT length) {
+  OsStatus_t status = SetFileSizeFromPath(path, length);
+  return OsStatusToErrno(status);
+}
+
+int readlink(const char *path, char *buf, size_t size) {
+  OsStatus_t status = GetFileLink(path, buf, size);
+  return OsStatusToErrno(status);
+}
+
+char* realpath(const char *path, char *buf) {
+  // @todo should dereference symbolic links and canonicalize path
+  OsStatus_t status = PathCanonicalize(path, buf, _MAXPATH);
+  if (status != OsSuccess) {
+    return NULL;
+  }
+  return buf;
+}
+
+int statvfs(const char *path, struct StatVFS *buf) {
+  OsFileSystemDescriptor_t descriptor;
+  OsStatus_t status = GetFileSystemInformationFromPath(path, &descriptor);
+  if (status != OsSuccess) {
+    return OsStatusToErrno(status);
+  }
+
+  buf->f_frsize = descriptor.BlockSize;
+  buf->f_blocks = descriptor.SegmentsTotal.QuadPart * descriptor.BlocksPerSegment;
+  buf->f_bfree = descriptor.SegmentsFree.QuadPart * descriptor.BlocksPerSegment;
+  buf->f_bavail = buf->f_blocks - buf->f_bfree;
+  return 0;
 }
 
 #else

@@ -106,6 +106,9 @@ bool Process::AreCoreFilesPrevented() { return coreFilesPrevented; }
 #ifdef LLVM_ON_UNIX
 #include "Unix/Process.inc"
 #endif
+#ifdef LLVM_ON_VALI
+#include "Vali/Process.inc"
+#endif
 #ifdef _WIN32
 #include "Windows/Process.inc"
 #endif

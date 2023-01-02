@@ -32,6 +32,9 @@ add_llvm_component_library(LLVMObject
   WindowsMachineFlag.cpp
   WindowsResource.cpp
   XCOFFObjectFile.cpp
+  VPEImportFile.cpp
+  VPEModuleDefinition.cpp
+  VPEObjectFile.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/Object

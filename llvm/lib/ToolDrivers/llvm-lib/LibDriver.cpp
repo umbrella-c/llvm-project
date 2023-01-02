@@ -19,6 +19,7 @@
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Object/ArchiveWriter.h"
 #include "llvm/Object/COFF.h"
+#include "llvm/Object/VPE.h"
 #include "llvm/Object/WindowsMachineFlag.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -161,6 +162,24 @@ static Expected<COFF::MachineTypes> getCOFFFileMachine(MemoryBufferRef MB) {
   return static_cast<COFF::MachineTypes>(Machine);
 }
 
+static Expected<COFF::MachineTypes> getVPEFileMachine(MemoryBufferRef MB) {
+  std::error_code EC;
+  auto Obj = object::VPEObjectFile::create(MB);
+  if (!Obj)
+    return Obj.takeError();
+
+  uint16_t Machine = (*Obj)->getMachine();
+  if (Machine != COFF::IMAGE_FILE_MACHINE_I386 &&
+      Machine != COFF::IMAGE_FILE_MACHINE_AMD64 &&
+      Machine != COFF::IMAGE_FILE_MACHINE_ARMNT &&
+      Machine != COFF::IMAGE_FILE_MACHINE_ARM64) {
+    return createStringError(inconvertibleErrorCode(),
+                             "unknown machine: " + std::to_string(Machine));
+  }
+
+  return static_cast<COFF::MachineTypes>(Machine);
+}
+
 static Expected<COFF::MachineTypes> getBitcodeFileMachine(MemoryBufferRef MB) {
   Expected<std::string> TripleStr = getBitcodeTargetTriple(MB);
   if (!TripleStr)
@@ -187,6 +206,7 @@ static void appendFile(std::vector<NewArchiveMember> &Members,
   file_magic Magic = identify_magic(MB.getBuffer());
 
   if (Magic != file_magic::coff_object && Magic != file_magic::bitcode &&
+      Magic != file_magic::vpe_object && Magic != file_magic::vpe_import_library &&
       Magic != file_magic::archive && Magic != file_magic::windows_resource &&
       Magic != file_magic::coff_import_library) {
     llvm::errs() << MB.getBufferIdentifier()
@@ -228,9 +248,12 @@ static void appendFile(std::vector<NewArchiveMember> &Members,
   // below does, but it's not a lot of work and it's a bit awkward to do
   // in writeArchive() which needs to support many tools, can't assume the
   // input is COFF, and doesn't have a good way to report errors.
-  if (Magic == file_magic::coff_object || Magic == file_magic::bitcode) {
+  if (Magic == file_magic::coff_object || Magic == file_magic::vpe_object || Magic == file_magic::bitcode) {
     Expected<COFF::MachineTypes> MaybeFileMachine =
-        (Magic == file_magic::coff_object) ? getCOFFFileMachine(MB)
+        (Magic == file_magic::coff_object || Magic == file_magic::vpe_object) ? 
+                                             (Magic == file_magic::coff_object ? 
+                                                getCOFFFileMachine(MB)
+                                              : getVPEFileMachine(MB))
                                            : getBitcodeFileMachine(MB);
     if (!MaybeFileMachine) {
       handleAllErrors(MaybeFileMachine.takeError(),

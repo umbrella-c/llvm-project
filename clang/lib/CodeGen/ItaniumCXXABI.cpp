@@ -1218,7 +1218,8 @@ void ItaniumCXXABI::emitVirtualObjectDelete(CodeGenFunction &CGF,
     // Track back to entry -2 and pull out the offset there.
     llvm::Value *OffsetPtr = CGF.Builder.CreateConstInBoundsGEP1_64(
         CGF.IntPtrTy, VTable, -2, "complete-offset.ptr");
-    llvm::Value *Offset = CGF.Builder.CreateAlignedLoad(CGF.IntPtrTy, OffsetPtr,                                                        CGF.getPointerAlign());
+    llvm::Value *Offset = CGF.Builder.CreateAlignedLoad(CGF.IntPtrTy, OffsetPtr,
+        CGF.getPointerAlign());
 
     // Apply the offset.
     llvm::Value *CompletePtr =
@@ -2942,7 +2943,8 @@ void ItaniumCXXABI::EmitThreadLocalInitFuncs(
     if (Init) {
       Init->setVisibility(Var->getVisibility());
       // Don't mark an extern_weak function DSO local on windows.
-      if (!CGM.getTriple().isOSWindows() || !Init->hasExternalWeakLinkage())
+      bool IsValiOrWindows = CGM.getTriple().isOSWindows() || CGM.getTriple().isOSVali();
+      if (!IsValiOrWindows || !Init->hasExternalWeakLinkage())
         Init->setDSOLocal(Var->isDSOLocal());
     }
 
@@ -3391,7 +3393,7 @@ static bool ShouldUseExternalRTTIDescriptor(CodeGenModule &CGM,
     bool IsDLLImport = RD->hasAttr<DLLImportAttr>();
 
     // Don't import the RTTI but emit it locally.
-    if (CGM.getTriple().isWindowsGNUEnvironment())
+    if (CGM.getTriple().isWindowsGNUEnvironment() || CGM.getTriple().isOSVali())
       return false;
 
     if (CGM.getVTables().isVTableExternal(RD)) {
@@ -3478,14 +3480,11 @@ static bool CanUseSingleInheritance(const CXXRecordDecl *RD) {
 
 void ItaniumRTTIBuilder::BuildVTablePointer(const Type *Ty) {
   // abi::__class_type_info.
-  static const char * const ClassTypeInfo =
-    "_ZTVN10__cxxabiv117__class_type_infoE";
+  static const char * const ClassTypeInfo = "_ZTVN10__cxxabiv117__class_type_infoE";
   // abi::__si_class_type_info.
-  static const char * const SIClassTypeInfo =
-    "_ZTVN10__cxxabiv120__si_class_type_infoE";
+  static const char * const SIClassTypeInfo = "_ZTVN10__cxxabiv120__si_class_type_infoE";
   // abi::__vmi_class_type_info.
-  static const char * const VMIClassTypeInfo =
-    "_ZTVN10__cxxabiv121__vmi_class_type_infoE";
+  static const char * const VMIClassTypeInfo = "_ZTVN10__cxxabiv121__vmi_class_type_infoE";
 
   const char *VTableName = nullptr;
 
@@ -3651,20 +3650,20 @@ static llvm::GlobalVariable::LinkageTypes getTypeInfoLinkage(CodeGenModule &CGM,
     if (!CGM.getLangOpts().RTTI)
       return llvm::GlobalValue::LinkOnceODRLinkage;
 
+    //bool IsValiOrWindowsItanium = CGM.getTriple().isWindowsItaniumEnvironment() || CGM.getTriple().isOSVali();
+    bool isMinGWOrVali = 
+      CGM.getContext().getTargetInfo().getTriple().isWindowsGNUEnvironment() || 
+      CGM.getContext().getTargetInfo().getTriple().isOSVali();
     if (const RecordType *Record = dyn_cast<RecordType>(Ty)) {
       const CXXRecordDecl *RD = cast<CXXRecordDecl>(Record->getDecl());
       if (RD->hasAttr<WeakAttr>())
         return llvm::GlobalValue::WeakODRLinkage;
-      if (CGM.getTriple().isWindowsItaniumEnvironment())
+      if (CGM.getTriple().isWindowsItaniumEnvironment() /*IsValiOrWindowsItanium */)
         if (RD->hasAttr<DLLImportAttr>() &&
             ShouldUseExternalRTTIDescriptor(CGM, Ty))
           return llvm::GlobalValue::ExternalLinkage;
-      // MinGW always uses LinkOnceODRLinkage for type info.
-      if (RD->isDynamicClass() &&
-          !CGM.getContext()
-               .getTargetInfo()
-               .getTriple()
-               .isWindowsGNUEnvironment())
+      // MinGW/Vali always uses LinkOnceODRLinkage for type info.
+      if (RD->isDynamicClass() && !isMinGWOrVali)
         return CGM.getVTableLinkage(RD);
     }
 
@@ -3714,8 +3713,8 @@ llvm::Constant *ItaniumRTTIBuilder::BuildTypeInfo(QualType Ty) {
   llvm::GlobalValue::DLLStorageClassTypes DLLStorageClass =
       llvm::GlobalValue::DefaultStorageClass;
   if (auto RD = Ty->getAsCXXRecordDecl()) {
-    if ((CGM.getTriple().isWindowsItaniumEnvironment() &&
-         RD->hasAttr<DLLExportAttr>()) ||
+    bool IsValiOrWindowsItanium = CGM.getTriple().isWindowsItaniumEnvironment() || CGM.getTriple().isOSVali();
+    if ((IsValiOrWindowsItanium && RD->hasAttr<DLLExportAttr>()) ||
         (CGM.shouldMapVisibilityToDLLExport(RD) &&
          !llvm::GlobalValue::isLocalLinkage(Linkage) &&
          llvmVisibility == llvm::GlobalValue::DefaultVisibility))
@@ -4058,7 +4057,8 @@ void ItaniumRTTIBuilder::BuildVMIClassTypeInfo(const CXXRecordDecl *RD) {
   // LLP64 platforms.
   QualType OffsetFlagsTy = CGM.getContext().LongTy;
   const TargetInfo &TI = CGM.getContext().getTargetInfo();
-  if (TI.getTriple().isOSCygMing() &&
+  auto IsLLP64 = TI.getTriple().isOSCygMing() || TI.getTriple().isOSVali();
+  if (IsLLP64 &&
       TI.getPointerWidth(LangAS::Default) > TI.getLongWidth())
     OffsetFlagsTy = CGM.getContext().LongLongTy;
   llvm::Type *OffsetFlagsLTy =

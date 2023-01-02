@@ -212,6 +212,8 @@ void LinkerDriver::addBuffer(std::unique_ptr<MemoryBuffer> mb,
   case file_magic::bitcode:
     ctx.symtab.addFile(make<BitcodeFile>(ctx, mbref, "", 0, lazy));
     break;
+  case file_magic::vpe_object:
+  case file_magic::vpe_import_library:
   case file_magic::coff_object:
   case file_magic::coff_import_library:
     ctx.symtab.addFile(make<ObjFile>(ctx, mbref, lazy));
@@ -222,6 +224,7 @@ void LinkerDriver::addBuffer(std::unique_ptr<MemoryBuffer> mb,
   case file_magic::coff_cl_gl_object:
     error(filename + ": is not a native COFF file. Recompile without /GL");
     break;
+  case file_magic::vpe_executable:
   case file_magic::pecoff_executable:
     if (config->mingw) {
       ctx.symtab.addFile(make<DLLFile>(ctx, mbref));
@@ -267,7 +270,7 @@ void LinkerDriver::addArchiveBuffer(MemoryBufferRef mb, StringRef symName,
                                     StringRef parentName,
                                     uint64_t offsetInArchive) {
   file_magic magic = identify_magic(mb.getBuffer());
-  if (magic == file_magic::coff_import_library) {
+  if (magic == file_magic::coff_import_library || magic == file_magic::vpe_import_library) {
     InputFile *imp = make<ImportFile>(ctx, mb);
     imp->parentName = parentName;
     ctx.symtab.addFile(imp);
@@ -275,7 +278,7 @@ void LinkerDriver::addArchiveBuffer(MemoryBufferRef mb, StringRef symName,
   }
 
   InputFile *obj;
-  if (magic == file_magic::coff_object) {
+  if (magic == file_magic::coff_object || magic == file_magic::vpe_object) {
     obj = make<ObjFile>(ctx, mb);
   } else if (magic == file_magic::bitcode) {
     obj =
@@ -473,6 +476,12 @@ StringRef LinkerDriver::doFindFile(StringRef filename) {
       path = SmallString<128>{getFilename(path.str())};
       if (sys::fs::exists(path.str()))
         return saver().save(path.str());
+    } else if (config->vpe) {
+      StringRef libpath = saver().save(path.str());
+      if (libpath.endswith_insensitive(".lib")) {
+        sys::path::replace_extension(path, ".dll.lib");
+        if (sys::fs::exists(path.str()))
+          return saver().save(path.str());
     }
   }
   return filename;
@@ -513,6 +522,18 @@ StringRef LinkerDriver::doFindLibMinGW(StringRef filename) {
   return doFindFile(libName);
 }
 
+// VPE specific. If an embedded directive specified to link to
+// foo.lib, but it isn't found, try libfoo.dll.lib instead.
+StringRef LinkerDriver::doFindLibVPE(StringRef filename) {
+  if (filename.contains('/') || filename.contains('\\'))
+    return filename;
+
+  SmallString<128> s = filename;
+  sys::path::replace_extension(s, ".dll.lib");
+  StringRef libName = saver.save(s.str());
+  return doFindFile(libName);
+}
+
 // Find library file from search path.
 StringRef LinkerDriver::doFindLib(StringRef filename) {
   // Add ".lib" to Filename if that has no file extension.
@@ -524,6 +545,8 @@ StringRef LinkerDriver::doFindLib(StringRef filename) {
   // looking for a MinGW formatted library name.
   if (config->mingw && ret == filename)
     return doFindLibMinGW(filename);
+  if (config->vpe && ret == filename)
+    return doFindLibVPE(filename);
   return ret;
 }
 
@@ -712,6 +735,8 @@ StringRef LinkerDriver::findDefaultEntry() {
 }
 
 WindowsSubsystem LinkerDriver::inferSubsystem() {
+  if (config->vpe)
+    return IMAGE_SUBSYSTEM_NATIVE;
   if (config->dll)
     return IMAGE_SUBSYSTEM_WINDOWS_GUI;
   if (config->mingw)
@@ -1478,8 +1503,9 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
     return;
   }
 
-  // Handle /lldmingw early, since it can potentially affect how other
+  // Handle /lldmingw and /lldvpe early, since it can potentially affect how other
   // options are handled.
+  config->vpe = args.hasArg(OPT_lldvpe);
   config->mingw = args.hasArg(OPT_lldmingw);
   if (config->mingw)
     ctx.e.errorLimitExceededMsg = "too many errors emitted, stopping now"
@@ -1914,13 +1940,16 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
   config->debugGHashes = debug == DebugKind::GHash || debug == DebugKind::Full;
   config->debugSymtab = debug == DebugKind::Symtab;
   config->autoImport =
-      args.hasFlag(OPT_auto_import, OPT_auto_import_no, config->mingw);
+      args.hasFlag(OPT_auto_import, OPT_auto_import_no, 
+        config->mingw || config->vpe);
   config->pseudoRelocs = args.hasFlag(
-      OPT_runtime_pseudo_reloc, OPT_runtime_pseudo_reloc_no, config->mingw);
+      OPT_runtime_pseudo_reloc, OPT_runtime_pseudo_reloc_no, 
+        config->mingw || config->vpe);
   config->callGraphProfileSort = args.hasFlag(
       OPT_call_graph_profile_sort, OPT_call_graph_profile_sort_no, true);
   config->stdcallFixup =
-      args.hasFlag(OPT_stdcall_fixup, OPT_stdcall_fixup_no, config->mingw);
+      args.hasFlag(OPT_stdcall_fixup, OPT_stdcall_fixup_no,
+        config->mingw || config->vpe);
   config->warnStdcallFixup = !args.hasArg(OPT_stdcall_fixup);
 
   // Don't warn about long section names, such as .debug_info, for mingw or
@@ -2029,7 +2058,8 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
     config->writeCheckSum = true;
   
   // Handle /safeseh, x86 only, on by default, except for mingw.
-  if (config->machine == I386) {
+  // and not supported on VPE
+  if (config->machine == I386 && !config->vpe) {
     config->safeSEH = args.hasFlag(OPT_safeseh, OPT_safeseh_no, !config->mingw);
     config->noSEH = args.hasArg(OPT_noseh);
   }
@@ -2098,12 +2128,21 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
     config->entry = addUndefined(mangle(arg->getValue()));
   } else if (!config->entry && !config->noEntry) {
     if (args.hasArg(OPT_dll)) {
-      StringRef s = (config->machine == I386) ? "__DllMainCRTStartup@12"
-                                              : "_DllMainCRTStartup";
+      StringRef s;
+      if (config->vpe) {
+        s = mangle("__CrtLibraryEntry");
+      }
+      else {
+        s = (config->machine == I386) ? "__DllMainCRTStartup@12" : "_DllMainCRTStartup";
+      }
       config->entry = addUndefined(s);
     } else if (config->driverWdm) {
       // /driver:wdm implies /entry:_NtProcessStartup
       config->entry = addUndefined(mangle("_NtProcessStartup"));
+    } else if (config->vpe) {
+      StringRef s = mangle("__CrtConsoleEntry");
+      config->entry = addUndefined(s);
+      log("Entry name inferred: " + s);
     } else {
       // Windows specific -- If entry point name is not given, we need to
       // infer that from user-defined entry name.
@@ -2184,7 +2223,7 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
     config->imageBase = getDefaultImageBase();
 
   ctx.symtab.addSynthetic(mangle("__ImageBase"), nullptr);
-  if (config->machine == I386) {
+  if (config->machine == I386 && !config->vpe) {
     ctx.symtab.addAbsolute("___safe_se_handler_table", 0);
     ctx.symtab.addAbsolute("___safe_se_handler_count", 0);
   }

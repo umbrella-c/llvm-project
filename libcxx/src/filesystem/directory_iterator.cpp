@@ -11,8 +11,12 @@
 #include <errno.h>
 #include <filesystem>
 #include <stack>
-
 #include "filesystem_common.h"
+
+#if defined(__MOLLENOS__)
+#include <os/types/file.h>
+#include <io.h>
+#else
 
 _LIBCPP_BEGIN_NAMESPACE_FILESYSTEM
 
@@ -92,6 +96,71 @@ private:
 
   HANDLE __stream_{INVALID_HANDLE_VALUE};
   WIN32_FIND_DATAW __data_;
+
+public:
+  path __root_;
+  directory_entry __entry_;
+};
+#elif defined(__MOLLENOS__)
+class __dir_stream {
+public:
+  __dir_stream() = delete;
+  __dir_stream& operator=(const __dir_stream&) = delete;
+
+  __dir_stream(__dir_stream&& other) noexcept : __stream_(other.__stream_),
+                                                __root_(move(other.__root_)),
+                                                __entry_(move(other.__entry_)) {
+    other.__stream_ = nullptr;
+  }
+
+  __dir_stream(const path& root, directory_options opts, error_code& ec)
+      : __stream_(nullptr), __root_(root) {
+    if (::opendir(root.c_str(), 0, &__stream_)) {
+      ec = detail::capture_errno();
+      const bool allow_eacess =
+          bool(opts & directory_options::skip_permission_denied);
+      if (allow_eacess && ec.value() == EACCES)
+        ec.clear();
+      return;
+    }
+    advance(ec);
+  }
+
+  ~__dir_stream() noexcept {
+    if (__stream_)
+      close();
+  }
+
+  bool good() const noexcept { return __stream_ != nullptr; }
+
+  bool advance(error_code& ec) {
+    while (true) {
+      auto str_type_pair = detail::io_readdir(__stream_, ec);
+      auto& str = str_type_pair.first;
+      if (str == "." || str == "..") {
+        continue;
+      } else if (ec || str.empty()) {
+        close();
+        return false;
+      } else {
+        __entry_.__assign_iter_entry(
+            __root_ / str,
+            directory_entry::__create_iter_result(str_type_pair.second));
+        return true;
+      }
+    }
+  }
+
+private:
+  error_code close() noexcept {
+    error_code m_ec;
+    if (::closedir(__stream_) == -1)
+      m_ec = detail::capture_errno();
+    __stream_ = nullptr;
+    return m_ec;
+  }
+
+  DIR* __stream_;
 
 public:
   path __root_;

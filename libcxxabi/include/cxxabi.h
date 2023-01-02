@@ -26,7 +26,7 @@
 #ifdef __cplusplus
 
 namespace std {
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__MOLLENOS__)
 class _LIBCXXABI_TYPE_VIS type_info; // forward declaration
 #else
 class type_info; // forward declaration

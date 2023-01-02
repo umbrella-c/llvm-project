@@ -500,8 +500,8 @@ CodeGenTypes::arrangeObjCMessageSendSignature(const ObjCMethodDecl *MD,
   }
 
   FunctionType::ExtInfo einfo;
-  bool IsWindows = getContext().getTargetInfo().getTriple().isOSWindows();
-  einfo = einfo.withCallingConv(getCallingConventionForDecl(MD, IsWindows));
+  bool IsWindowsOrVali = getContext().getTargetInfo().getTriple().isOSWindows() || getContext().getTargetInfo().getTriple().isOSVali();
+  einfo = einfo.withCallingConv(getCallingConventionForDecl(MD, IsWindowsOrVali));
 
   if (getContext().getLangOpts().ObjCAutoRefCount &&
       MD->hasAttr<NSReturnsRetainedAttr>())
@@ -4214,9 +4214,9 @@ void CodeGenFunction::EmitCallArgs(
   if (Prototype.P) {
     const auto *MD = Prototype.P.dyn_cast<const ObjCMethodDecl *>();
     if (MD) {
+      bool IsWindowsOrVali = getContext().getTargetInfo().getTriple().isOSWindows() || getContext().getTargetInfo().getTriple().isOSVali();
       IsVariadic = MD->isVariadic();
-      ExplicitCC = getCallingConventionForDecl(
-          MD, CGM.getTarget().getTriple().isOSWindows());
+      ExplicitCC = getCallingConventionForDecl(MD, IsWindowsOrVali);
       ArgTypes.assign(MD->param_type_begin() + ParamsToSkip,
                       MD->param_type_end());
     } else {
@@ -4469,7 +4469,8 @@ QualType CodeGenFunction::getVarArgType(const Expr *Arg) {
   // System headers on Windows define NULL to 0 instead of 0LL on Win64. MSVC
   // implicitly widens null pointer constants that are arguments to varargs
   // functions to pointer-sized ints.
-  if (!getTarget().getTriple().isOSWindows())
+  bool IsValiOrWindows = getTarget().getTriple().isOSWindows() || getTarget().getTriple().isOSVali();
+  if (!IsValiOrWindows)
     return Arg->getType();
 
   if (Arg->getType()->isIntegerType() &&

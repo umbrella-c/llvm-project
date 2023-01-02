@@ -182,7 +182,7 @@ void ModuleSymbolTable::printSymbolName(raw_ostream &OS, Symbol S) const {
   auto *GV = S.get<GlobalValue *>();
   if (GV->hasDLLImportStorageClass())
     OS << "__imp_";
-
+    
   Mang.getNameWithPrefix(OS, GV, false);
 }
 

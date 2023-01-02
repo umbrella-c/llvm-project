@@ -29,7 +29,7 @@ using namespace llvm;
 //===----------------------------------------------------------------------===//
 
 #if LLVM_ENABLE_THREADS == 0 ||                                                \
-    (!defined(_WIN32) && !defined(HAVE_PTHREAD_H))
+    (!(defined(_WIN32) || defined(LLVM_ON_VALI)) && !defined(HAVE_PTHREAD_H))
 uint64_t llvm::get_threadid() { return 0; }
 
 uint32_t llvm::get_max_thread_name_length() { return 0; }
@@ -67,6 +67,9 @@ unsigned llvm::ThreadPoolStrategy::compute_thread_count() const {
 // Include the platform-specific parts of this class.
 #ifdef LLVM_ON_UNIX
 #include "Unix/Threading.inc"
+#endif
+#ifdef LLVM_ON_VALI
+#include "Vali/Threading.inc"
 #endif
 #ifdef _WIN32
 #include "Windows/Threading.inc"

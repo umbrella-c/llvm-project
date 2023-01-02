@@ -130,3 +130,9 @@ LLVMRemarkEntryGetNextArg(LLVMRemarkArgRef ArgIt, LLVMRemarkEntryRef Remark) {
 
   return reinterpret_cast<LLVMRemarkArgRef>(const_cast<Argument *>(Next));
 }
+
+#ifdef LLVM_ON_VALI
+extern "C" void dllmain(int action) {
+  (void)action;
+}
+#endif

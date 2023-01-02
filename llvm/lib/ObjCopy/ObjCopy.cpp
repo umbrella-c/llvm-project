@@ -53,6 +53,7 @@ Error executeObjcopyOnBinary(const MultiFormatConfig &Config,
     return coff::executeObjcopyOnBinary(Config.getCommonConfig(), *COFFConfig,
                                         *COFFBinary, Out);
   }
+  // TODO: vpe version
   if (auto *MachOBinary = dyn_cast<object::MachOObjectFile>(&In)) {
     Expected<const MachOConfig &> MachOConfig = Config.getMachOConfig();
     if (!MachOConfig)

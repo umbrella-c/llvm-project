@@ -228,6 +228,7 @@ def include_optional : Joined<["/", "-", "/?", "-?"], "includeoptional:">,
     HelpText<"Add symbol as undefined, but allow it to remain undefined">;
 def kill_at : F<"kill-at">;
 def lldmingw : F<"lldmingw">;
+def lldvpe : F<"lldvpe">;
 def noseh : F<"noseh">;
 def osversion : P_priv<"osversion">;
 def output_def : Joined<["/", "-", "/?", "-?"], "output-def:">;

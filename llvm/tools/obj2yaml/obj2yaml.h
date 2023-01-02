@@ -31,6 +31,8 @@ llvm::Error minidump2yaml(llvm::raw_ostream &Out,
                           const llvm::object::MinidumpFile &Obj);
 llvm::Error xcoff2yaml(llvm::raw_ostream &Out,
                        const llvm::object::XCOFFObjectFile &Obj);
+std::error_code vpe2yaml(llvm::raw_ostream &Out,
+                           const llvm::object::VPEObjectFile &Obj);
 std::error_code wasm2yaml(llvm::raw_ostream &Out,
                           const llvm::object::WasmObjectFile &Obj);
 llvm::Error archive2yaml(llvm::raw_ostream &Out, llvm::MemoryBufferRef Source);

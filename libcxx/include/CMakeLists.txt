@@ -533,6 +533,8 @@ set(files
   __support/solaris/floatingpoint.h
   __support/solaris/wchar.h
   __support/solaris/xlocale.h
+  __support/vali/limits_vali.h
+  __support/vali/locale_vali.h
   __support/win32/locale_win32.h
   __support/xlocale/__nop_locale_mgmt.h
   __support/xlocale/__posix_l_fallback.h
@@ -848,6 +850,13 @@ set(files
   wctype.h
   )
 
+if(LIBCXX_HAS_EXTERNAL_THREAD_API)
+  set(files
+    ${files}
+    __external_threading
+  )
+endif()
+
 foreach(feature LIBCXX_ENABLE_FILESYSTEM LIBCXX_ENABLE_LOCALIZATION LIBCXX_ENABLE_FSTREAM LIBCXX_ENABLE_THREADS LIBCXX_ENABLE_WIDE_CHARACTERS)
   if (NOT ${${feature}})
     set(requires_${feature} "requires LIBCXX_CONFIGURED_WITHOUT_SUPPORT_FOR_THIS_HEADER")
@@ -878,6 +887,11 @@ target_include_directories(cxx-headers INTERFACE ${LIBCXX_GENERATED_INCLUDE_DIR}
                                                  ${LIBCXX_GENERATED_INCLUDE_TARGET_DIR})
 
 if (LIBCXX_INSTALL_HEADERS)
+  if (LLVM_BOOTSTRAP_RUNTIME)
+    install(TARGETS cxx-headers EXPORT LLVMExports)
+    set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS cxx-headers)
+  endif()
+  
   foreach(file ${files})
     get_filename_component(dir ${file} DIRECTORY)
     install(FILES ${file}

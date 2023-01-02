@@ -85,7 +85,7 @@ if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 endif()
 
 # library checks
-if( NOT PURE_WINDOWS )
+if( NOT PURE_WINDOWS AND NOT MOLLENOS )
   check_library_exists(pthread pthread_create "" HAVE_LIBPTHREAD)
   if (HAVE_LIBPTHREAD)
     check_library_exists(pthread pthread_rwlock_init "" HAVE_PTHREAD_RWLOCK_INIT)
@@ -217,7 +217,7 @@ endif()
 # party code may call MSan interceptors like strlen, leading to false positives.
 if(NOT LLVM_USE_SANITIZER MATCHES "Memory.*")
   # Don't look for these libraries on Windows.
-  if (NOT PURE_WINDOWS)
+  if (NOT PURE_WINDOWS AND NOT MOLLENOS)
     # Skip libedit if using ASan as it contains memory leaks.
     if (LLVM_ENABLE_LIBEDIT AND NOT LLVM_USE_SANITIZER MATCHES ".*Address.*")
       find_package(LibEdit)
@@ -530,6 +530,10 @@ else ()
   endif ()
 endif ()
 
+if( MOLLENOS )
+  set(SHLIBEXT ".lib")
+endif ()
+
 if( MSVC )
   set(SHLIBEXT ".lib")
   set(stricmp "_stricmp")
@@ -573,7 +577,7 @@ endif( MSVC )
 
 if( LLVM_ENABLE_THREADS )
   # Check if threading primitives aren't supported on this platform
-  if( NOT HAVE_PTHREAD_H AND NOT WIN32 )
+  if( NOT HAVE_PTHREAD_H AND NOT WIN32 AND NOT MOLLENOS )
     set(LLVM_ENABLE_THREADS 0)
   endif()
 endif()

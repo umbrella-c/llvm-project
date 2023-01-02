@@ -40,7 +40,11 @@
 #else
 #define ALWAYS_INLINE __attribute__((always_inline))
 #define NOINLINE __attribute__((noinline))
+#if defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112L
+#define NORETURN _Noreturn
+#else
 #define NORETURN __attribute__((noreturn))
+#endif
 #define UNUSED __attribute__((unused))
 #endif
 
@@ -64,7 +68,7 @@
   COMPILER_RT_ALIAS_VISIBILITY(aliasname) \
   __asm__(SYMBOL_NAME(aliasname) " = " SYMBOL_NAME(name)); \
   COMPILER_RT_ABI __typeof(name) aliasname;
-#elif defined(_WIN32)
+#elif defined(_WIN32) || defined(MOLLENOS)
 #define COMPILER_RT_ALIAS(name, aliasname)
 #else
 #error Unsupported target

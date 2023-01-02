@@ -42,6 +42,7 @@ protected:
     ID_Archive,
     ID_MachOUniversalBinary,
     ID_COFFImportFile,
+    ID_VPEImportFile,
     ID_IR,            // LLVM IR
     ID_TapiUniversal, // Text-based Dynamic Library Stub file.
     ID_TapiFile,      // Text-based Dynamic Library Stub file.
@@ -55,6 +56,7 @@ protected:
     // Object and children.
     ID_StartObjects,
     ID_COFF,
+    ID_VPE,
 
     ID_XCOFF32, // AIX XCOFF 32-bit
     ID_XCOFF64, // AIX XCOFF 64-bit
@@ -108,7 +110,7 @@ public:
   }
 
   bool isSymbolic() const {
-    return isIR() || isObject() || isCOFFImportFile() || isTapiFile();
+    return isIR() || isObject() || isCOFFImportFile() || isVPEImportFile() || isTapiFile();
   }
 
   bool isArchive() const { return TypeID == ID_Archive; }
@@ -132,6 +134,14 @@ public:
   }
 
   bool isXCOFF() const { return TypeID == ID_XCOFF32 || TypeID == ID_XCOFF64; }
+
+  bool isVPE() const {
+    return TypeID == ID_VPE;
+  }
+
+  bool isVPEImportFile() const {
+    return TypeID == ID_VPEImportFile;
+  }
 
   bool isWasm() const { return TypeID == ID_Wasm; }
 
@@ -164,6 +174,8 @@ public:
       return Triple::MachO;
     if (isELF())
       return Triple::ELF;
+    if (isVPE())
+      return Triple::VPE;
     return Triple::UnknownObjectFormat;
   }
 

@@ -25,6 +25,9 @@
 # define WIN32_LEAN_AND_MEAN
 # define NOMINMAX
 # include <windows.h>
+# include <fcntl.h> /* values for fchmodat */
+#elif defined(__MOLLENOS__)
+# include <io.h>
 #else
 # include <dirent.h>
 # include <sys/stat.h>
@@ -32,7 +35,6 @@
 # include <unistd.h>
 #endif
 #include <time.h>
-#include <fcntl.h> /* values for fchmodat */
 
 #if __has_include(<sys/sendfile.h>)
 # include <sys/sendfile.h>
@@ -45,7 +47,7 @@
 # define _LIBCPP_FILESYSTEM_USE_FSTREAM
 #endif
 
-#if !defined(CLOCK_REALTIME) && !defined(_LIBCPP_WIN32API)
+#if !defined(CLOCK_REALTIME) && !defined(_LIBCPP_WIN32API) && !defined(__MOLLENOS__)
 # include <sys/time.h> // for gettimeofday and timeval
 #endif
 
@@ -60,7 +62,7 @@ namespace {
 bool isSeparator(path::value_type C) {
   if (C == '/')
     return true;
-#if defined(_LIBCPP_WIN32API)
+#if defined(_LIBCPP_WIN32API) || defined(__MOLLENOS__)
   if (C == '\\')
     return true;
 #endif
@@ -352,6 +354,17 @@ private:
     return P;
   }
 
+  PosPtr consumeDriveIdentifier(PosPtr P, PosPtr End) const noexcept {
+    if (P == End)
+      return nullptr;
+    while (P < End) {
+      if (P + 1 < End && P[0] == ':' && (P[1] == '/' || P[1] == '\\')) {
+        return P + 2;
+      }
+    }
+    return nullptr;
+  }
+
   PosPtr consumeDriveLetter(PosPtr P, PosPtr End) const noexcept {
     if (P == End)
       return nullptr;
@@ -380,6 +393,9 @@ private:
     if (PosPtr Ret = consumeDriveLetter(P, End))
       return Ret;
     if (PosPtr Ret = consumeNetworkRoot(P, End))
+      return Ret;
+#elif defined(__MOLLENOS__)
+    if (PosPtr Ret = consumeDriveIdentifier(P, End))
       return Ret;
 #endif
     return nullptr;
@@ -660,6 +676,13 @@ _FilesystemClock::time_point _FilesystemClock::now() noexcept {
     __throw_system_error(errno, "clock_gettime(CLOCK_REALTIME) failed");
   return time_point(__secs(tp.tv_sec) +
                     chrono::duration_cast<duration>(__nsecs(tp.tv_nsec)));
+#elif defined(__MOLLENOS__)
+  typedef chrono::duration<rep, nano> __nsecs;
+  struct timespec tp;
+  if (0 != timespec_get(&tp, TIME_MONOTONIC))
+    __throw_system_error(errno, "timespec_get(&tp, TIME_MONOTONIC) failed");
+  return time_point(__secs(tp.tv_sec) +
+                    chrono::duration_cast<duration>(__nsecs(tp.tv_nsec)));
 #else
   typedef chrono::duration<rep, micro> __microsecs;
   timeval tv;
@@ -708,7 +731,7 @@ path __canonical(path const& orig_p, error_code* ec) {
   ErrorHandler<path> err("canonical", ec, &orig_p, &cwd);
 
   path p = __do_absolute(orig_p, &cwd, ec);
-#if (defined(_POSIX_VERSION) && _POSIX_VERSION >= 200112) || defined(_LIBCPP_WIN32API)
+#if (defined(_POSIX_VERSION) && _POSIX_VERSION >= 200112) || defined(_LIBCPP_WIN32API) || defined(__MOLLENOS__)
   std::unique_ptr<path::value_type, decltype(&::free)>
     hold(detail::realpath(p.c_str(), nullptr), &::free);
   if (hold.get() == nullptr)
@@ -1095,7 +1118,7 @@ void __create_symlink(path const& from, path const& to, error_code* ec) {
 path __current_path(error_code* ec) {
   ErrorHandler<path> err("current_path", ec);
 
-#if defined(_LIBCPP_WIN32API) || defined(__GLIBC__) || defined(__APPLE__)
+#if defined(_LIBCPP_WIN32API) || defined(__GLIBC__) || defined(__APPLE__) || defined(__MOLLENOS__)
   // Common extension outside of POSIX getcwd() spec, without needing to
   // preallocate a buffer. Also supported by a number of other POSIX libcs.
   int size = 0;
@@ -1231,6 +1254,8 @@ void __last_write_time(const path& p, file_time_type new_time, error_code* ec) {
   FILETIME last_write = timespec_to_filetime(ts);
   if (!SetFileTime(h, nullptr, nullptr, &last_write))
     return err.report(detail::make_windows_error(GetLastError()));
+#elif defined(__MOLLENOS__)
+  // @todo not supported
 #else
   error_code m_ec;
   array<TimeSpec, 2> tbuf;
@@ -1290,6 +1315,12 @@ void __permissions(const path& p, perms prms, perm_options opts,
 #if defined(AT_SYMLINK_NOFOLLOW) && defined(AT_FDCWD)
   const int flags = set_sym_perms ? AT_SYMLINK_NOFOLLOW : 0;
   if (detail::fchmodat(AT_FDCWD, p.c_str(), real_perms, flags) == -1) {
+    return err.report(capture_errno());
+  }
+#elif defined(__MOLLENOS__)
+  if (set_sym_perms)
+    return err.report(errc::operation_not_supported);
+  if (detail::chmod(p.c_str(), real_perms) == -1) {
     return err.report(capture_errno());
   }
 #else
@@ -1543,6 +1574,10 @@ path __temp_directory_path(error_code* ec) {
   if (buf[retval-1] == L'\\')
     buf[retval-1] = L'\0';
   path p(buf);
+#elif defined(__MOLLENOS__)
+  char buf[_MAXPATH] = { 0 };
+  GetApplicationTemporaryDirectory(&buf[0], _MAXPATH);
+  path p(&buf[0]);
 #else
   const char* env_paths[] = {"TMPDIR", "TMP", "TEMP", "TEMPDIR"};
   const char* ret = nullptr;
@@ -1745,7 +1780,7 @@ static PathPartKind ClassifyPathPart(string_view_t Part) {
     return PK_DotDot;
   if (Part == PATHSTR("/"))
     return PK_RootSep;
-#if defined(_LIBCPP_WIN32API)
+#if defined(_LIBCPP_WIN32API) || defined(__MOLLENOS__)
   if (Part == PATHSTR("\\"))
     return PK_RootSep;
 #endif

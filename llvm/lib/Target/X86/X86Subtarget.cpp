@@ -112,7 +112,7 @@ X86Subtarget::classifyLocalReference(const GlobalValue *GV) const {
   }
 
   // The COFF dynamic linker just patches the executable sections.
-  if (isTargetCOFF())
+  if (isTargetCOFF() || isTargetVPE())
     return X86II::MO_NO_FLAG;
 
   if (isTargetDarwin()) {
@@ -151,7 +151,7 @@ unsigned char X86Subtarget::classifyGlobalReference(const GlobalValue *GV,
   if (TM.shouldAssumeDSOLocal(M, GV))
     return classifyLocalReference(GV);
 
-  if (isTargetCOFF()) {
+  if (isTargetCOFF() || isTargetVPE()) {
     // ExternalSymbolSDNode like _tls_index.
     if (!GV)
       return X86II::MO_NO_FLAG;
@@ -160,7 +160,7 @@ unsigned char X86Subtarget::classifyGlobalReference(const GlobalValue *GV,
     return X86II::MO_COFFSTUB;
   }
   // Some JIT users use *-win32-elf triples; these shouldn't use GOT tables.
-  if (isOSWindows())
+  if (isOSWindows() || isOSVali())
     return X86II::MO_NO_FLAG;
 
   if (is64Bit()) {
@@ -205,7 +205,7 @@ X86Subtarget::classifyGlobalFunctionReference(const GlobalValue *GV,
   // - They are intrinsic functions (!GV)
   // - They are marked dllimport
   // - They are extern_weak, and a stub is needed
-  if (isTargetCOFF()) {
+  if (isTargetCOFF() || isTargetVPE()) {
     if (!GV)
       return X86II::MO_NO_FLAG;
     if (GV->hasDLLImportStorageClass())
@@ -249,7 +249,7 @@ bool X86Subtarget::isLegalToCallImmediateAddr() const {
   // FIXME: I386 PE/COFF supports PC relative calls using IMAGE_REL_I386_REL32
   // but WinCOFFObjectWriter::RecordRelocation cannot emit them.  Once it does,
   // the following check for Win32 should be removed.
-  if (Is64Bit || isTargetWin32())
+  if (Is64Bit || isTargetWin32() || isTargetVali32())
     return false;
   return isTargetELF() || TM.getRelocationModel() == Reloc::Static;
 }
@@ -327,7 +327,7 @@ X86Subtarget::X86Subtarget(const Triple &TT, StringRef CPU, StringRef TuneCPU,
     setPICStyle(PICStyles::Style::None);
   else if (is64Bit())
     setPICStyle(PICStyles::Style::RIPRel);
-  else if (isTargetCOFF())
+  else if (isTargetCOFF() || isTargetVPE())
     setPICStyle(PICStyles::Style::None);
   else if (isTargetDarwin())
     setPICStyle(PICStyles::Style::StubPIC);

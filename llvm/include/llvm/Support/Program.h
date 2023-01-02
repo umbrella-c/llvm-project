@@ -30,6 +30,8 @@ namespace sys {
   // a colon on Unix or a semicolon on Windows.
 #if defined(LLVM_ON_UNIX)
   const char EnvPathSeparator = ':';
+#elif defined (LLVM_ON_VALI)
+  const char EnvPathSeparator = ';';
 #elif defined (_WIN32)
   const char EnvPathSeparator = ';';
 #endif
@@ -37,6 +39,9 @@ namespace sys {
 #if defined(_WIN32)
   typedef unsigned long procid_t; // Must match the type of DWORD on Windows.
   typedef void *process_t;        // Must match the type of HANDLE on Windows.
+#elif defined(LLVM_ON_VALI)
+  typedef UUId_t procid_t;
+  typedef procid_t process_t;
 #else
   typedef ::pid_t procid_t;
   typedef procid_t process_t;
@@ -237,6 +242,12 @@ namespace sys {
   /// on
   /// Windows.
   ErrorOr<std::wstring> flattenWindowsCommandLine(ArrayRef<StringRef> Args);
+#elif defined(LLVM_ON_VALI)
+  /// Given a list of command line arguments, quote and escape them as necessary
+  /// to build a single flat command line appropriate for calling CreateProcess
+  /// on
+  /// Windows.
+  ErrorOr<std::string> flattenArgs(ArrayRef<StringRef> Args);
 #endif
   }
 }

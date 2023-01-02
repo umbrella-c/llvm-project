@@ -52,6 +52,7 @@
 #include "llvm/MC/MCSectionMachO.h"
 #include "llvm/MC/MCSectionWasm.h"
 #include "llvm/MC/MCSectionXCOFF.h"
+#include "llvm/MC/MCSectionVPE.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCSymbolELF.h"
@@ -2651,4 +2652,440 @@ MCSection *TargetLoweringObjectFileGOFF::SelectSectionForGlobal(
                                        nullptr, nullptr);
 
   return getContext().getObjectFileInfo()->getTextSection();
+}
+
+//===----------------------------------------------------------------------===//
+//                                  VPE
+//===----------------------------------------------------------------------===//
+
+static unsigned
+getVPESectionFlags(SectionKind K, const TargetMachine &TM) {
+  unsigned Flags = 0;
+  bool isThumb = TM.getTargetTriple().getArch() == Triple::thumb;
+
+  if (K.isMetadata())
+    Flags |=
+      COFF::IMAGE_SCN_MEM_DISCARDABLE;
+  else if (K.isText())
+    Flags |=
+      COFF::IMAGE_SCN_MEM_EXECUTE |
+      COFF::IMAGE_SCN_MEM_READ |
+      COFF::IMAGE_SCN_CNT_CODE |
+      (isThumb ? COFF::IMAGE_SCN_MEM_16BIT : (COFF::SectionCharacteristics)0);
+  else if (K.isBSS())
+    Flags |=
+      COFF::IMAGE_SCN_CNT_UNINITIALIZED_DATA |
+      COFF::IMAGE_SCN_MEM_READ |
+      COFF::IMAGE_SCN_MEM_WRITE;
+  else if (K.isThreadLocal())
+    Flags |=
+      COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+      COFF::IMAGE_SCN_MEM_READ |
+      COFF::IMAGE_SCN_MEM_WRITE;
+  else if (K.isReadOnly() || K.isReadOnlyWithRel())
+    Flags |=
+      COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+      COFF::IMAGE_SCN_MEM_READ;
+  else if (K.isWriteable())
+    Flags |=
+      COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+      COFF::IMAGE_SCN_MEM_READ |
+      COFF::IMAGE_SCN_MEM_WRITE;
+
+  return Flags;
+}
+
+static const GlobalValue *getComdatGVForVPE(const GlobalValue *GV) {
+  const Comdat *C = GV->getComdat();
+  assert(C && "expected GV to have a Comdat!");
+
+  StringRef ComdatGVName = C->getName();
+  const GlobalValue *ComdatGV = GV->getParent()->getNamedValue(ComdatGVName);
+  if (!ComdatGV)
+    report_fatal_error("Associative COMDAT symbol '" + ComdatGVName +
+                       "' does not exist.");
+
+  if (ComdatGV->getComdat() != C)
+    report_fatal_error("Associative COMDAT symbol '" + ComdatGVName +
+                       "' is not a key for its COMDAT.");
+
+  return ComdatGV;
+}
+
+static int getSelectionForVPE(const GlobalValue *GV) {
+  if (const Comdat *C = GV->getComdat()) {
+    const GlobalValue *ComdatKey = getComdatGVForVPE(GV);
+    if (const auto *GA = dyn_cast<GlobalAlias>(ComdatKey))
+      ComdatKey = GA->getBaseObject();
+    if (ComdatKey == GV) {
+      switch (C->getSelectionKind()) {
+      case Comdat::Any:
+        return COFF::IMAGE_COMDAT_SELECT_ANY;
+      case Comdat::ExactMatch:
+        return COFF::IMAGE_COMDAT_SELECT_EXACT_MATCH;
+      case Comdat::Largest:
+        return COFF::IMAGE_COMDAT_SELECT_LARGEST;
+      case Comdat::NoDeduplicate:
+        return COFF::IMAGE_COMDAT_SELECT_NODUPLICATES;
+      case Comdat::SameSize:
+        return COFF::IMAGE_COMDAT_SELECT_SAME_SIZE;
+      }
+    } else {
+      return COFF::IMAGE_COMDAT_SELECT_ASSOCIATIVE;
+    }
+  }
+  return 0;
+}
+
+MCSection *TargetLoweringObjectFileVPE::getExplicitSectionGlobal(
+    const GlobalObject *GO, SectionKind Kind, const TargetMachine &TM) const {
+  int Selection = 0;
+  unsigned Characteristics = getVPESectionFlags(Kind, TM);
+  StringRef Name = GO->getSection();
+  StringRef COMDATSymName = "";
+  if (GO->hasComdat()) {
+    Selection = getSelectionForVPE(GO);
+    const GlobalValue *ComdatGV;
+    if (Selection == COFF::IMAGE_COMDAT_SELECT_ASSOCIATIVE)
+      ComdatGV = getComdatGVForVPE(GO);
+    else
+      ComdatGV = GO;
+
+    if (!ComdatGV->hasPrivateLinkage()) {
+      MCSymbol *Sym = TM.getSymbol(ComdatGV);
+      COMDATSymName = Sym->getName();
+      Characteristics |= COFF::IMAGE_SCN_LNK_COMDAT;
+    } else {
+      Selection = 0;
+    }
+  }
+
+  return getContext().getVPESection(Name, Characteristics, Kind, COMDATSymName,
+                                     Selection);
+}
+
+static StringRef getVPESectionNameForUniqueGlobal(SectionKind Kind) {
+  if (Kind.isText())
+    return ".text";
+  if (Kind.isBSS())
+    return ".bss";
+  if (Kind.isThreadLocal())
+    return ".tls$";
+  if (Kind.isReadOnly() || Kind.isReadOnlyWithRel())
+    return ".rdata";
+  return ".data";
+}
+
+MCSection *TargetLoweringObjectFileVPE::SelectSectionForGlobal(
+    const GlobalObject *GO, SectionKind Kind, const TargetMachine &TM) const {
+  // If we have -ffunction-sections then we should emit the global value to a
+  // uniqued section specifically for it.
+  bool EmitUniquedSection;
+  if (Kind.isText())
+    EmitUniquedSection = TM.getFunctionSections();
+  else
+    EmitUniquedSection = TM.getDataSections();
+
+  if ((EmitUniquedSection && !Kind.isCommon()) || GO->hasComdat()) {
+    SmallString<256> Name = getVPESectionNameForUniqueGlobal(Kind);
+
+    unsigned Characteristics = getVPESectionFlags(Kind, TM);
+
+    Characteristics |= COFF::IMAGE_SCN_LNK_COMDAT;
+    int Selection = getSelectionForVPE(GO);
+    if (!Selection)
+      Selection = COFF::IMAGE_COMDAT_SELECT_NODUPLICATES;
+    const GlobalValue *ComdatGV;
+    if (GO->hasComdat())
+      ComdatGV = getComdatGVForVPE(GO);
+    else
+      ComdatGV = GO;
+
+    unsigned UniqueID = MCContext::GenericSectionID;
+    if (EmitUniquedSection)
+      UniqueID = NextUniqueID++;
+
+    if (!ComdatGV->hasPrivateLinkage()) {
+      MCSymbol *Sym = TM.getSymbol(ComdatGV);
+      StringRef COMDATSymName = Sym->getName();
+
+      if (const auto *F = dyn_cast<Function>(GO))
+        if (Optional<StringRef> Prefix = F->getSectionPrefix())
+          raw_svector_ostream(Name) << '$' << *Prefix;
+
+      return getContext().getVPESection(Name, Characteristics, Kind,
+                                         COMDATSymName, Selection, UniqueID);
+    } else {
+      SmallString<256> TmpData;
+      getMangler().getNameWithPrefix(TmpData, GO, /*CannotUsePrivateLabel=*/true);
+      return getContext().getVPESection(Name, Characteristics, Kind, TmpData,
+                                         Selection, UniqueID);
+    }
+  }
+
+  if (Kind.isText())
+    return TextSection;
+
+  if (Kind.isThreadLocal())
+    return TLSDataSection;
+
+  if (Kind.isReadOnly() || Kind.isReadOnlyWithRel())
+    return ReadOnlySection;
+
+  // Note: we claim that common symbols are put in BSSSection, but they are
+  // really emitted with the magic .comm directive, which creates a symbol table
+  // entry but not a section.
+  if (Kind.isBSS() || Kind.isCommon())
+    return BSSSection;
+
+  return DataSection;
+}
+
+void TargetLoweringObjectFileVPE::getNameWithPrefix(
+    SmallVectorImpl<char> &OutName, const GlobalValue *GV,
+    const TargetMachine &TM) const {
+  bool CannotUsePrivateLabel = false;
+  if (GV->hasPrivateLinkage() &&
+      ((isa<Function>(GV) && TM.getFunctionSections()) ||
+       (isa<GlobalVariable>(GV) && TM.getDataSections())))
+    CannotUsePrivateLabel = true;
+
+  getMangler().getNameWithPrefix(OutName, GV, CannotUsePrivateLabel);
+}
+
+MCSection *TargetLoweringObjectFileVPE::getSectionForJumpTable(
+    const Function &F, const TargetMachine &TM) const {
+  // If the function can be removed, produce a unique section so that
+  // the table doesn't prevent the removal.
+  const Comdat *C = F.getComdat();
+  bool EmitUniqueSection = TM.getFunctionSections() || C;
+  if (!EmitUniqueSection)
+    return ReadOnlySection;
+
+  // FIXME: we should produce a symbol for F instead.
+  if (F.hasPrivateLinkage())
+    return ReadOnlySection;
+
+  MCSymbol *Sym = TM.getSymbol(&F);
+  StringRef COMDATSymName = Sym->getName();
+
+  SectionKind Kind = SectionKind::getReadOnly();
+  StringRef SecName = getVPESectionNameForUniqueGlobal(Kind);
+  unsigned Characteristics = getVPESectionFlags(Kind, TM);
+  Characteristics |= COFF::IMAGE_SCN_LNK_COMDAT;
+  unsigned UniqueID = NextUniqueID++;
+
+  return getContext().getVPESection(
+      SecName, Characteristics, Kind, COMDATSymName,
+      COFF::IMAGE_COMDAT_SELECT_ASSOCIATIVE, UniqueID);
+}
+
+void TargetLoweringObjectFileVPE::emitModuleMetadata(MCStreamer &Streamer,
+                                                      Module &M) const {
+  emitLinkerDirectives(Streamer, M);
+
+  unsigned Version = 0;
+  unsigned Flags = 0;
+  StringRef Section;
+
+  GetObjCImageInfo(M, Version, Flags, Section);
+  if (!Section.empty()) {
+    auto &C = getContext();
+    auto *S = C.getVPESection(Section,
+                              COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+                              COFF::IMAGE_SCN_MEM_READ,
+                              SectionKind::getReadOnly());
+    Streamer.SwitchSection(S);
+    Streamer.emitLabel(C.getOrCreateSymbol(StringRef("OBJC_IMAGE_INFO")));
+    Streamer.emitInt32(Version);
+    Streamer.emitInt32(Flags);
+    Streamer.AddBlankLine();
+  }
+
+  emitCGProfileMetadata(Streamer, M);
+}
+
+void TargetLoweringObjectFileVPE::emitLinkerDirectives(
+    MCStreamer &Streamer, Module &M) const {
+  if (NamedMDNode *LinkerOptions = M.getNamedMetadata("llvm.linker.options")) {
+    // Emit the linker options to the linker .drectve section.  According to the
+    // spec, this section is a space-separated string containing flags for
+    // linker.
+    MCSection *Sec = getDrectveSection();
+    Streamer.SwitchSection(Sec);
+    for (const auto *Option : LinkerOptions->operands()) {
+      for (const auto &Piece : cast<MDNode>(Option)->operands()) {
+        // Lead with a space for consistency with our dllexport implementation.
+        std::string Directive(" ");
+        Directive.append(std::string(cast<MDString>(Piece)->getString()));
+        Streamer.emitBytes(Directive);
+      }
+    }
+  }
+
+  // Emit /EXPORT: flags for each exported global as necessary.
+  std::string Flags;
+  for (const GlobalValue &GV : M.global_values()) {
+    raw_string_ostream OS(Flags);
+    emitLinkerFlagsForGlobalVPE(OS, &GV, getContext().getTargetTriple(),
+                                 getMangler());
+    OS.flush();
+    if (!Flags.empty()) {
+      Streamer.SwitchSection(getDrectveSection());
+      Streamer.emitBytes(Flags);
+    }
+    Flags.clear();
+  }
+
+  // Emit /INCLUDE: flags for each used global as necessary.
+  if (const auto *LU = M.getNamedGlobal("llvm.used")) {
+    assert(LU->hasInitializer() && "expected llvm.used to have an initializer");
+    assert(isa<ArrayType>(LU->getValueType()) &&
+           "expected llvm.used to be an array type");
+    if (const auto *A = cast<ConstantArray>(LU->getInitializer())) {
+      for (const Value *Op : A->operands()) {
+        const auto *GV = cast<GlobalValue>(Op->stripPointerCasts());
+        // Global symbols with internal or private linkage are not visible to
+        // the linker, and thus would cause an error when the linker tried to
+        // preserve the symbol due to the `/include:` directive.
+        if (GV->hasLocalLinkage())
+          continue;
+
+        raw_string_ostream OS(Flags);
+        emitLinkerFlagsForUsedVPE(OS, GV, getContext().getTargetTriple(),
+                                  getMangler());
+        OS.flush();
+
+        if (!Flags.empty()) {
+          Streamer.SwitchSection(getDrectveSection());
+          Streamer.emitBytes(Flags);
+        }
+        Flags.clear();
+      }
+    }
+  }
+}
+
+void TargetLoweringObjectFileVPE::Initialize(MCContext &Ctx,
+                                              const TargetMachine &TM) {
+  TargetLoweringObjectFile::Initialize(Ctx, TM);
+  StaticCtorSection = Ctx.getVPESection(".CRT$XCU", COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+                                           COFF::IMAGE_SCN_MEM_READ,
+                           SectionKind::getReadOnly());
+  StaticDtorSection = Ctx.getVPESection(".CRT$XTX", COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+                                           COFF::IMAGE_SCN_MEM_READ,
+                           SectionKind::getReadOnly());
+}
+
+static MCSectionVPE *getVPEStaticStructorSection(MCContext &Ctx,
+                                                   const Triple &T, bool IsCtor,
+                                                   unsigned Priority,
+                                                   const MCSymbol *KeySym,
+                                                   MCSectionVPE *Default) {
+    // If the priority is the default, use .CRT$XCU, possibly associative.
+    if (Priority == 65535)
+      return Ctx.getAssociativeVPESection(Default, KeySym, 0);
+
+    // Otherwise, we need to compute a new section name. Low priorities should
+    // run earlier. The linker will sort sections ASCII-betically, and we need a
+    // string that sorts between .CRT$XCA and .CRT$XCU. In the general case, we
+    // make a name like ".CRT$XCT12345", since that runs before .CRT$XCU. Really
+    // low priorities need to sort before 'L', since the CRT uses that
+    // internally, so we use ".CRT$XCA00001" for them.
+    SmallString<24> Name;
+    raw_svector_ostream OS(Name);
+    OS << ".CRT$X" << (IsCtor ? "C" : "T") <<
+        (Priority < 200 ? 'A' : 'T') << format("%05u", Priority);
+    MCSectionVPE *Sec = Ctx.getVPESection(
+        Name, COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ,
+        SectionKind::getReadOnly());
+    return Ctx.getAssociativeVPESection(Sec, KeySym, 0);
+}
+
+MCSection *TargetLoweringObjectFileVPE::getStaticCtorSection(
+    unsigned Priority, const MCSymbol *KeySym) const {
+  return getVPEStaticStructorSection(
+      getContext(), getContext().getTargetTriple(), true, Priority, KeySym,
+      cast<MCSectionVPE>(StaticCtorSection));
+}
+
+MCSection *TargetLoweringObjectFileVPE::getStaticDtorSection(
+    unsigned Priority, const MCSymbol *KeySym) const {
+  return getVPEStaticStructorSection(
+      getContext(), getContext().getTargetTriple(), false, Priority, KeySym,
+      cast<MCSectionVPE>(StaticDtorSection));
+}
+
+const MCExpr *TargetLoweringObjectFileVPE::lowerRelativeReference(
+    const GlobalValue *LHS, const GlobalValue *RHS,
+    const TargetMachine &TM) const {
+
+  // Our symbols should exist in address space zero, cowardly no-op if
+  // otherwise.
+  if (LHS->getType()->getPointerAddressSpace() != 0 ||
+      RHS->getType()->getPointerAddressSpace() != 0)
+    return nullptr;
+
+  // Both ptrtoint instructions must wrap global objects:
+  // - Only global variables are eligible for image relative relocations.
+  // - The subtrahend refers to the special symbol __ImageBase, a GlobalVariable.
+  // We expect __ImageBase to be a global variable without a section, externally
+  // defined.
+  //
+  // It should look something like this: @__ImageBase = external constant i8
+  if (!isa<GlobalObject>(LHS) || !isa<GlobalVariable>(RHS) ||
+      LHS->isThreadLocal() || RHS->isThreadLocal() ||
+      RHS->getName() != "__ImageBase" || !RHS->hasExternalLinkage() ||
+      cast<GlobalVariable>(RHS)->hasInitializer() || RHS->hasSection())
+    return nullptr;
+
+  return MCSymbolRefExpr::create(TM.getSymbol(LHS),
+                                 MCSymbolRefExpr::VK_COFF_IMGREL32,
+                                 getContext());
+}
+
+MCSection *TargetLoweringObjectFileVPE::getSectionForConstant(
+    const DataLayout &DL, SectionKind Kind, const Constant *C,
+    Align &Alignment) const {
+  if (Kind.isMergeableConst() && C &&
+      getContext().getAsmInfo()->hasCOFFComdatConstants()) {
+    // This creates comdat sections with the given symbol name, but unless
+    // AsmPrinter::GetCPISymbol actually makes the symbol global, the symbol
+    // will be created with a null storage class, which makes GNU binutils
+    // error out.
+    const unsigned Characteristics = COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+                                     COFF::IMAGE_SCN_MEM_READ |
+                                     COFF::IMAGE_SCN_LNK_COMDAT;
+    std::string COMDATSymName;
+    if (Kind.isMergeableConst4()) {
+      if (Alignment <= 4) {
+        COMDATSymName = "__real@" + scalarConstantToHexString(C);
+        Alignment = Align(4);
+      }
+    } else if (Kind.isMergeableConst8()) {
+      if (Alignment <= 8) {
+        COMDATSymName = "__real@" + scalarConstantToHexString(C);
+        Alignment = Align(8);
+      }
+    } else if (Kind.isMergeableConst16()) {
+      // FIXME: These may not be appropriate for non-x86 architectures.
+      if (Alignment <= 16) {
+        COMDATSymName = "__xmm@" + scalarConstantToHexString(C);
+        Alignment = Align(16);
+      }
+    } else if (Kind.isMergeableConst32()) {
+      if (Alignment <= 32) {
+        COMDATSymName = "__ymm@" + scalarConstantToHexString(C);
+        Alignment = Align(32);
+      }
+    }
+
+    if (!COMDATSymName.empty())
+      return getContext().getVPESection(".rdata", Characteristics, Kind,
+                                         COMDATSymName,
+                                         COFF::IMAGE_COMDAT_SELECT_ANY);
+  }
+
+  return TargetLoweringObjectFile::getSectionForConstant(DL, Kind, C,
+                                                         Alignment);
 }

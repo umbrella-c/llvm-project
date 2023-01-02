@@ -77,12 +77,13 @@ Comdat *llvm::getOrCreateFunctionComdat(Function &F, Triple &T) {
   if (auto Comdat = F.getComdat()) return Comdat;
   assert(F.hasName());
   Module *M = F.getParent();
+  bool IsVPEOrCOFF = T.isOSBinFormatCOFF() || T.isOSBinFormatVPE();
 
   // Make a new comdat for the function. Use the "no duplicates" selection kind
   // if the object file format supports it. For COFF we restrict it to non-weak
   // symbols.
   Comdat *C = M->getOrInsertComdat(F.getName());
-  if (T.isOSBinFormatELF() || (T.isOSBinFormatCOFF() && !F.isWeakForLinker()))
+  if (T.isOSBinFormatELF() || (IsVPEOrCOFF && !F.isWeakForLinker()))
     C->setSelectionKind(Comdat::NoDeduplicate);
   F.setComdat(C);
   return C;

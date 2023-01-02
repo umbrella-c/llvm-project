@@ -181,7 +181,8 @@ protected:
   }
 
   std::string ManglePublicSymbol(StringRef Name) {
-    return (StringRef(CGM.getTriple().isOSBinFormatCOFF() ? "$_" : "._") + Name).str();
+    bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+    return (StringRef(IsVPEOrCOFF ? "$_" : "._") + Name).str();
   }
 
   std::string SymbolForProtocol(Twine Name) {
@@ -1015,7 +1016,8 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
     if (!isa) {
       isa = new llvm::GlobalVariable(TheModule, IdTy, /* isConstant */false,
               llvm::GlobalValue::ExternalLinkage, nullptr, Sym);
-      if (CGM.getTriple().isOSBinFormatCOFF()) {
+      bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+      if (IsVPEOrCOFF) {
         cast<llvm::GlobalValue>(isa)->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
       }
     } else if (isa->getType() != PtrToIdTy)
@@ -1033,7 +1035,8 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
 
     ConstantInitBuilder Builder(CGM);
     auto Fields = Builder.beginStruct();
-    if (!CGM.getTriple().isOSBinFormatCOFF()) {
+    bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+    if (!IsVPEOrCOFF) {
       Fields.add(isa);
     } else {
       Fields.addNullPointer(PtrTy);
@@ -1108,7 +1111,7 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
       ObjCStrGV->setComdat(TheModule.getOrInsertComdat(StringName));
       ObjCStrGV->setVisibility(llvm::GlobalValue::HiddenVisibility);
     }
-    if (CGM.getTriple().isOSBinFormatCOFF()) {
+    if (IsVPEOrCOFF) {
       std::pair<llvm::GlobalVariable*, int> v{ObjCStrGV, 0};
       EarlyInitList.emplace_back(Sym, v);
     }
@@ -1231,7 +1234,8 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
           Int8Ty, false, llvm::GlobalValue::ExternalWeakLinkage,
           nullptr, SymbolForClass(Name)));
     else {
-      if (CGM.getTriple().isOSBinFormatCOFF()) {
+      bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+      if (IsVPEOrCOFF) {
         IdentifierInfo &II = CGM.getContext().Idents.get(Name);
         TranslationUnitDecl *TUDecl = CGM.getContext().getTranslationUnitDecl();
         DeclContext *DC = TranslationUnitDecl::castToDeclContext(TUDecl);
@@ -1498,7 +1502,8 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
   /// subsection and then insert zero-sized symbols in subsections a and z.
   std::pair<llvm::Constant*,llvm::Constant*>
   GetSectionBounds(StringRef Section) {
-    if (CGM.getTriple().isOSBinFormatCOFF()) {
+    bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+    if (IsVPEOrCOFF) {
       if (emptyStruct == nullptr) {
         emptyStruct = llvm::StructType::create(VMContext, ".objc_section_sentinel");
         emptyStruct->setBody({}, /*isPacked*/true);
@@ -1548,7 +1553,8 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
     ConstantInitBuilder builder(CGM);
     auto InitStructBuilder = builder.beginStruct();
     InitStructBuilder.addInt(Int64Ty, 0);
-    auto &sectionVec = CGM.getTriple().isOSBinFormatCOFF() ? PECOFFSectionsBaseNames : SectionsBaseNames;
+    bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+    auto &sectionVec = IsVPEOrCOFF ? PECOFFSectionsBaseNames : SectionsBaseNames;
     for (auto *s : sectionVec) {
       auto bounds = GetSectionBounds(s);
       InitStructBuilder.add(bounds.first);
@@ -1577,7 +1583,7 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
     // Objective-C loads at the end of library load.  This means +load methods
     // will run before any other static constructors, but that static
     // constructors can see a fully initialised Objective-C state.
-    if (CGM.getTriple().isOSBinFormatCOFF())
+    if (IsVPEOrCOFF)
         InitVar->setSection(".CRT$XCLz");
     else
     {
@@ -1615,7 +1621,7 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
     // can always guarantee that the _start and _stop symbols will exist and be
     // meaningful.  This is not required on COFF platforms, where our start and
     // stop symbols will create the section.
-    if (!CGM.getTriple().isOSBinFormatCOFF()) {
+    if (!IsVPEOrCOFF) {
       createNullGlobal(".objc_null_selector", {NULLPtr, NULLPtr},
           sectionName<SelectorSection>());
       if (Categories.empty())
@@ -1706,7 +1712,7 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
   }
   void GenerateClass(const ObjCImplementationDecl *OID) override {
     ASTContext &Context = CGM.getContext();
-    bool IsCOFF = CGM.getTriple().isOSBinFormatCOFF();
+    bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
 
     // Get the class name
     ObjCInterfaceDecl *classDecl =
@@ -1784,7 +1790,7 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
       {
         SuperClass = new llvm::GlobalVariable(TheModule, PtrTy, false,
             llvm::GlobalValue::ExternalLinkage, nullptr, SuperClassName);
-        if (IsCOFF) {
+        if (IsVPEOrCOFF) {
           auto Storage = llvm::GlobalValue::DefaultStorageClass;
           if (SuperClassDecl->hasAttr<DLLImportAttr>())
             Storage = llvm::GlobalValue::DLLImportStorageClass;
@@ -1794,7 +1800,7 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
           cast<llvm::GlobalValue>(SuperClass)->setDLLStorageClass(Storage);
         }
       }
-      if (!IsCOFF)
+      if (!IsVPEOrCOFF)
         classFields.add(llvm::ConstantExpr::getBitCast(SuperClass, PtrTy));
       else
         classFields.addNullPointer(PtrTy);
@@ -1951,7 +1957,7 @@ class CGObjCGNUstep2 : public CGObjCGNUstep {
     classRefSymbol->setSection(sectionName<ClassReferenceSection>());
     classRefSymbol->setInitializer(llvm::ConstantExpr::getBitCast(classStruct, IdTy));
 
-    if (IsCOFF) {
+    if (IsVPEOrCOFF) {
       // we can't import a class struct.
       if (OID->getClassInterface()->hasAttr<DLLExportAttr>()) {
         classStruct->setDLLStorageClass(llvm::GlobalValue::DLLExportStorageClass);
@@ -2323,7 +2329,8 @@ llvm::Value *CGObjCGNU::GetClass(CodeGenFunction &CGF,
 
 llvm::Value *CGObjCGNU::EmitNSAutoreleasePoolClassRef(CodeGenFunction &CGF) {
   auto *Value  = GetClassNamed(CGF, "NSAutoreleasePool", false);
-  if (CGM.getTriple().isOSBinFormatCOFF()) {
+  bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+  if (IsVPEOrCOFF) {
     if (auto *ClassSymbol = dyn_cast<llvm::GlobalVariable>(Value)) {
       IdentifierInfo &II = CGF.CGM.getContext().Idents.get("NSAutoreleasePool");
       TranslationUnitDecl *TUDecl = CGM.getContext().getTranslationUnitDecl();

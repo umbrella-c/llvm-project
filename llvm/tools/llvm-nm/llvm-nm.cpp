@@ -25,6 +25,8 @@
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/COFF.h"
 #include "llvm/Object/COFFImportFile.h"
+#include "llvm/Object/VPE.h"
+#include "llvm/Object/VPEImportFile.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/IRObjectFile.h"
 #include "llvm/Object/MachO.h"
@@ -295,6 +297,8 @@ static char isSymbolList64Bit(SymbolicFile &Obj) {
   if (auto *IRObj = dyn_cast<IRObjectFile>(&Obj))
     return Triple(IRObj->getTargetTriple()).isArch64Bit();
   if (isa<COFFObjectFile>(Obj) || isa<COFFImportFile>(Obj))
+    return false;
+  if (isa<VPEObjectFile>(Obj) || isa<VPEImportFile>(Obj))
     return false;
   if (XCOFFObjectFile *XCOFFObj = dyn_cast<XCOFFObjectFile>(&Obj))
     return XCOFFObj->is64Bit();

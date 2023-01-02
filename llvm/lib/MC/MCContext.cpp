@@ -32,6 +32,7 @@
 #include "llvm/MC/MCSectionSPIRV.h"
 #include "llvm/MC/MCSectionWasm.h"
 #include "llvm/MC/MCSectionXCOFF.h"
+#include "llvm/MC/MCSectionVPE.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCSymbol.h"
@@ -41,6 +42,7 @@
 #include "llvm/MC/MCSymbolMachO.h"
 #include "llvm/MC/MCSymbolWasm.h"
 #include "llvm/MC/MCSymbolXCOFF.h"
+#include "llvm/MC/MCSymbolVPE.h"
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/MC/SectionKind.h"
 #include "llvm/Support/Casting.h"
@@ -102,6 +104,9 @@ MCContext::MCContext(const Triple &TheTriple, const MCAsmInfo *mai,
     break;
   case Triple::GOFF:
     Env = IsGOFF;
+    break;
+  case Triple::VPE:
+    Env = IsVPE;
     break;
   case Triple::DXContainer:
     Env = IsDXContainer;
@@ -251,6 +256,8 @@ MCSymbol *MCContext::createSymbolImpl(const StringMapEntry<bool> *Name,
     return new (Name, *this) MCSymbolMachO(Name, IsTemporary);
   case MCContext::IsWasm:
     return new (Name, *this) MCSymbolWasm(Name, IsTemporary);
+  case MCContext::IsVPE:
+    return new (Name, *this) MCSymbolVPE(Name, IsTemporary);
   case MCContext::IsXCOFF:
     return createXCOFFSymbolImpl(Name, IsTemporary);
   case MCContext::IsDXContainer:
@@ -716,6 +723,75 @@ MCSectionCOFF *MCContext::getAssociativeCOFFSection(MCSectionCOFF *Sec,
 
   return getCOFFSection(Sec->getName(), Characteristics, Sec->getKind(), "", 0,
                         UniqueID);
+}
+
+MCSectionVPE *MCContext::getVPESection(StringRef Section,
+                                       unsigned Characteristics,
+                                       SectionKind Kind,
+                                       StringRef COMDATSymName, int Selection,
+                                       unsigned UniqueID,
+                                       const char *BeginSymName) {
+  MCSymbol *COMDATSymbol = nullptr;
+  if (!COMDATSymName.empty()) {
+    COMDATSymbol = getOrCreateSymbol(COMDATSymName);
+    COMDATSymName = COMDATSymbol->getName();
+  }
+
+
+  // Do the lookup, if we have a hit, return it.
+  VPESectionKey T{Section, COMDATSymName, Selection, UniqueID};
+  auto IterBool = VPEUniquingMap.insert(std::make_pair(T, nullptr));
+  auto Iter = IterBool.first;
+  if (!IterBool.second)
+    return Iter->second;
+
+  MCSymbol *Begin = nullptr;
+  if (BeginSymName)
+    Begin = createTempSymbol(BeginSymName, false);
+
+  StringRef CachedName = Iter->first.SectionName;
+  MCSectionVPE *Result = new (VPEAllocator.Allocate()) MCSectionVPE(
+      CachedName, Characteristics, COMDATSymbol, Selection, Kind, Begin);
+
+  Iter->second = Result;
+  return Result;
+}
+
+MCSectionVPE *MCContext::getVPESection(StringRef Section,
+                                       unsigned Characteristics,
+                                       SectionKind Kind,
+                                       const char *BeginSymName) {
+  return getVPESection(Section, Characteristics, Kind, "", 0, GenericSectionID,
+                        BeginSymName);
+}
+
+MCSectionVPE *MCContext::getVPESection(StringRef Section) {
+  VPESectionKey T{Section, "", 0, GenericSectionID};
+  auto Iter = VPEUniquingMap.find(T);
+  if (Iter == VPEUniquingMap.end())
+    return nullptr;
+  return Iter->second;
+}
+
+MCSectionVPE *MCContext::getAssociativeVPESection(MCSectionVPE *Sec,
+                                                  const MCSymbol *KeySym,
+                                                  unsigned UniqueID) {
+  // Return the normal section if we don't have to be associative or unique.
+  if (!KeySym && UniqueID == GenericSectionID)
+    return Sec;
+
+  // If we have a key symbol, make an associative section with the same name and
+  // kind as the normal section.
+  unsigned Characteristics = Sec->getCharacteristics();
+  if (KeySym) {
+    Characteristics |= COFF::IMAGE_SCN_LNK_COMDAT;
+    return getVPESection(Sec->getName(), Characteristics,
+                          Sec->getKind(), KeySym->getName(),
+                          COFF::IMAGE_COMDAT_SELECT_ASSOCIATIVE, UniqueID);
+  }
+
+  return getVPESection(Sec->getName(), Characteristics, Sec->getKind(),
+                        "", 0, UniqueID);
 }
 
 MCSectionWasm *MCContext::getWasmSection(const Twine &Section, SectionKind K,

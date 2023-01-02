@@ -31,7 +31,7 @@
 #  define _LIBCXXABI_COMPILER_IBM
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__MOLLENOS__)
  #if defined(_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS)
   #define _LIBCXXABI_HIDDEN
   #define _LIBCXXABI_DATA_VIS

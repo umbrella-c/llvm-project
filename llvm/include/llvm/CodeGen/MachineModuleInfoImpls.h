@@ -102,6 +102,28 @@ public:
   SymbolListTy GetGVStubList() { return getSortedStubs(GVStubs); }
 };
 
+/// MachineModuleInfoVPE - This is a MachineModuleInfoImpl implementation
+/// for VPE targets.
+class MachineModuleInfoVPE : public MachineModuleInfoImpl {
+  /// GVStubs - These stubs are used to materialize global addresses in PIC
+  /// mode.
+  DenseMap<MCSymbol *, StubValueTy> GVStubs;
+
+  virtual void anchor(); // Out of line virtual method.
+
+public:
+  MachineModuleInfoVPE(const MachineModuleInfo &) {}
+
+  StubValueTy &getGVStubEntry(MCSymbol *Sym) {
+    assert(Sym && "Key cannot be null");
+    return GVStubs[Sym];
+  }
+
+  /// Accessor methods to return the set of stubs in sorted order.
+
+  SymbolListTy GetGVStubList() { return getSortedStubs(GVStubs); }
+};
+
 /// MachineModuleInfoWasm - This is a MachineModuleInfoImpl implementation
 /// for Wasm targets.
 class MachineModuleInfoWasm : public MachineModuleInfoImpl {

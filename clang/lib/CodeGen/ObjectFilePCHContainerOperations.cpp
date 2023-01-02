@@ -304,11 +304,13 @@ public:
       // The on-disk hashtable needs to be aligned.
       ASTSym->setAlignment(llvm::Align(8));
 
+      bool IsVPEOrCOFF = Triple.isOSBinFormatCOFF() || Triple.isOSBinFormatVPE();
+
       // Mach-O also needs a segment name.
       if (Triple.isOSBinFormatMachO())
         ASTSym->setSection("__CLANG,__clangast");
       // COFF has an eight character length limit.
-      else if (Triple.isOSBinFormatCOFF())
+      else if (IsVPEOrCOFF)
         ASTSym->setSection("clangast");
       else
         ASTSym->setSection("__clangast");

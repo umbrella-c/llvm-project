@@ -172,7 +172,7 @@ public:
 
     bool IsWinCOFF =
         getTriple().isOSWindows() && getTriple().isOSBinFormatCOFF();
-    if (IsWinCOFF)
+    if (IsWinCOFF || getTriple().isOSVali())
       MaxVectorAlign = MaxTLSAlign = 8192u * getCharWidth();
   }
 
@@ -695,12 +695,25 @@ public:
   }
 };
 
+// x86-32 Vali target
+class LLVM_LIBRARY_VISIBILITY ValiX86_32TargetInfo
+    : public ValiTargetInfo<X86_32TargetInfo> {
+public:
+  ValiX86_32TargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
+      : ValiTargetInfo<X86_32TargetInfo>(Triple, Opts) {
+    DoubleAlign = LongLongAlign = 64;
+    resetDataLayout("e-m:x-p:32:32-p270:32:32-p271:32:32-p272:64:"
+                    "64-i64:64-f80:32-n8:16:32-a:0:32-S32", "_");
+  }
+};
+
 // x86-64 generic target
 class LLVM_LIBRARY_VISIBILITY X86_64TargetInfo : public X86TargetInfo {
 public:
   X86_64TargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
       : X86TargetInfo(Triple, Opts) {
     const bool IsX32 = getTriple().isX32();
+    bool IsVali = getTriple().isOSVali();
     bool IsWinCOFF =
         getTriple().isOSWindows() && getTriple().isOSBinFormatCOFF();
     LongWidth = LongAlign = PointerWidth = PointerAlign = IsX32 ? 32 : 64;
@@ -719,7 +732,7 @@ public:
     // Pointers are 32-bit in x32.
     resetDataLayout(IsX32 ? "e-m:e-p:32:32-p270:32:32-p271:32:32-p272:64:64-"
                             "i64:64-f80:128-n8:16:32:64-S128"
-                          : IsWinCOFF ? "e-m:w-p270:32:32-p271:32:32-p272:64:"
+                          : (IsWinCOFF || IsVali) ? "e-m:w-p270:32:32-p271:32:32-p272:64:"
                                         "64-i64:64-f80:128-n8:16:32:64-S128"
                                       : "e-m:e-p270:32:32-p271:32:32-p272:64:"
                                         "64-i64:64-f80:128-n8:16:32:64-S128");
@@ -966,6 +979,57 @@ public:
     LongDoubleFormat = &llvm::APFloat::IEEEquad();
   }
 };
+
+// x86-64 Vali target
+class LLVM_LIBRARY_VISIBILITY ValiX86_64TargetInfo
+    : public ValiTargetInfo<X86_64TargetInfo> {
+public:
+  ValiX86_64TargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
+      : ValiTargetInfo<X86_64TargetInfo>(Triple, Opts) {
+    // Vali is LLP64
+    LongWidth = LongAlign = 32;
+    DoubleAlign = LongLongAlign = 64;
+    IntMaxType = SignedLongLong;
+    Int64Type = SignedLongLong;
+    SizeType = UnsignedLongLong;
+    PtrDiffType = SignedLongLong;
+    IntPtrType = SignedLongLong;
+    LongDoubleWidth = LongDoubleAlign = 64;
+    LongDoubleFormat = &llvm::APFloat::IEEEdouble();
+  }
+
+  BuiltinVaListKind getBuiltinVaListKind() const override {
+    return TargetInfo::CharPtrBuiltinVaList;
+  }
+
+  CallingConvCheckResult checkCallingConvention(CallingConv CC) const override {
+    switch (CC) {
+    case CC_X86StdCall:
+    case CC_X86ThisCall:
+    case CC_X86FastCall:
+      return CCCR_Ignore;
+    case CC_C:
+    case CC_X86VectorCall:
+    case CC_IntelOclBicc:
+    case CC_PreserveMost:
+    case CC_PreserveAll:
+    case CC_X86_64SysV:
+    case CC_Swift:
+    case CC_SwiftAsync:
+    case CC_X86RegCall:
+    case CC_OpenCLKernel:
+      return CCCR_OK;
+    default:
+      return CCCR_Warning;
+    }
+  }
+
+  TargetInfo::CallingConvKind
+  getCallingConvKind(bool ClangABICompat4) const override {
+    return CCK_MicrosoftWin64;
+  }
+};
+
 } // namespace targets
 } // namespace clang
 #endif // LLVM_CLANG_LIB_BASIC_TARGETS_X86_H

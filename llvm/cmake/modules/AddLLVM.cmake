@@ -144,6 +144,9 @@ function(add_llvm_symbol_exports target_name export_file)
     else()
       message(FATAL_ERROR "Unsupported Windows toolchain")
     endif()
+    if(MOLLENOS)
+      set(export_file_linker_flag "-Xlinker -def:\"${export_file_linker_flag}\"")
+    endif()
     set_property(TARGET ${target_name} APPEND_STRING PROPERTY
                  LINK_FLAGS " ${export_file_linker_flag}")
   endif()
@@ -289,7 +292,7 @@ function(add_link_opts target_name)
           set_property(TARGET ${target_name} APPEND_STRING PROPERTY
                        LINK_FLAGS " -Wl,-z,discard-unused=sections")
         endif()
-      elseif(NOT MSVC AND NOT CMAKE_SYSTEM_NAME MATCHES "AIX|OS390")
+      elseif(NOT MSVC AND NOT MOLLENOS AND NOT CMAKE_SYSTEM_NAME MATCHES "AIX|OS390")
         # TODO Revisit this later on z/OS.
         set_property(TARGET ${target_name} APPEND_STRING PROPERTY
                      LINK_FLAGS " -Wl,--gc-sections")
@@ -316,7 +319,7 @@ function(set_output_directory target)
 
   # module_dir -- corresponding to LIBRARY_OUTPUT_DIRECTORY.
   # It affects output of add_library(MODULE).
-  if(WIN32 OR CYGWIN)
+  if(WIN32 OR CYGWIN OR MOLLENOS)
     # DLL platform
     set(module_dir ${ARG_BINARY_DIR})
   else()
@@ -654,6 +657,10 @@ function(llvm_add_library name)
     if (LLVM_EXPORTED_SYMBOL_FILE)
       add_llvm_symbol_exports( ${name} ${LLVM_EXPORTED_SYMBOL_FILE} )
     endif()
+
+    if(LLVM_BOOTSTRAP_RUNTIME)
+      target_link_libraries(${name} PRIVATE unwind_shared cxx_shared cxxabi_shared)
+    endif()
   endif()
 
   if(ARG_SHARED)
@@ -681,7 +688,7 @@ function(llvm_add_library name)
     set(libtype PRIVATE)
   endif()
 
-  if(ARG_MODULE AND LLVM_EXPORT_SYMBOLS_FOR_PLUGINS AND ARG_PLUGIN_TOOL AND (WIN32 OR CYGWIN))
+  if(ARG_MODULE AND LLVM_EXPORT_SYMBOLS_FOR_PLUGINS AND ARG_PLUGIN_TOOL AND (WIN32 OR CYGWIN OR MOLLENOS))
     # On DLL platforms symbols are imported from the tool by linking against it.
     set(llvm_libs ${ARG_PLUGIN_TOOL})
   elseif (NOT ARG_COMPONENT_LIB)
@@ -1026,6 +1033,9 @@ macro(add_llvm_executable name)
     # API for all shared libaries loaded by this executable.
     target_link_libraries(${name} PRIVATE ${LLVM_PTHREAD_LIB})
   endif()
+  if(LLVM_BOOTSTRAP_RUNTIME)
+    target_link_libraries(${name} PRIVATE unwind_shared cxx_shared cxxabi_shared)
+  endif()
 
   llvm_codesign(${name} ENTITLEMENTS ${ARG_ENTITLEMENTS} BUNDLE_PATH ${ARG_BUNDLE_PATH})
 endmacro(add_llvm_executable name)
@@ -1263,7 +1273,7 @@ function(export_executable_symbols target)
     if(CYGWIN OR MINGW)
       set_target_properties(${target} PROPERTIES IMPORT_SUFFIX ".exe.a")
     endif()
-  elseif(NOT (WIN32 OR CYGWIN))
+  elseif(NOT (WIN32 OR CYGWIN OR MOLLENOS))
     # On Windows auto-exporting everything doesn't work because of the limit on
     # the size of the exported symbol table, but on other platforms we can do
     # it without any trouble.
@@ -1390,6 +1400,9 @@ macro(add_llvm_utility name)
 
   add_llvm_executable(${name} DISABLE_LLVM_LINK_LLVM_DYLIB ${ARGN})
   set_target_properties(${name} PROPERTIES FOLDER "Utils")
+  if(LLVM_BOOTSTRAP_RUNTIME)
+    target_link_libraries(${name} PRIVATE unwind_shared cxx_shared cxxabi_shared)
+  endif()
   if ( ${name} IN_LIST LLVM_TOOLCHAIN_UTILITIES OR NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     if (LLVM_INSTALL_UTILS AND LLVM_BUILD_UTILS)
       get_target_export_arg(${name} LLVM export_to_llvmexports)

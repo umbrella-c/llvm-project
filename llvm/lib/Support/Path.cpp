@@ -23,7 +23,7 @@
 #include "llvm/Support/Signals.h"
 #include <cctype>
 
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(MOLLENOS)
 #include <unistd.h>
 #else
 #include <io.h>
@@ -1197,6 +1197,9 @@ Error readNativeFileToEOF(file_t FileHandle, SmallVectorImpl<char> &Buffer,
 // Include the truly platform-specific parts.
 #if defined(LLVM_ON_UNIX)
 #include "Unix/Path.inc"
+#endif
+#if defined(LLVM_ON_VALI)
+#include "Vali/Path.inc"
 #endif
 #if defined(_WIN32)
 #include "Windows/Path.inc"

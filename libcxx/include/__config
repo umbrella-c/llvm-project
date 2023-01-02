@@ -69,7 +69,7 @@
 #    define _LIBCPP_OBJECT_FORMAT_ELF 1
 #  elif defined(__MACH__)
 #    define _LIBCPP_OBJECT_FORMAT_MACHO 1
-#  elif defined(_WIN32)
+#  elif defined(_WIN32) || (__MOLLENOS__)
 #    define _LIBCPP_OBJECT_FORMAT_COFF 1
 #  elif defined(__wasm__)
 #    define _LIBCPP_OBJECT_FORMAT_WASM 1
@@ -384,6 +384,8 @@
 #    define _LIBCPP_USING_NACL_RANDOM
 #  elif defined(_LIBCPP_WIN32API)
 #    define _LIBCPP_USING_WIN32_RANDOM
+#  elif defined(__MOLLENOS__)
+#    define _LIBCPP_USING_CRAND_RANDOM
 #  else
 #    define _LIBCPP_USING_DEV_RANDOM
 #  endif
@@ -901,6 +903,9 @@ _LIBCPP_BEGIN_NAMESPACE_STD _LIBCPP_END_NAMESPACE_STD
 #      define _LIBCPP_HAS_THREAD_API_PTHREAD
 #    elif defined(_LIBCPP_WIN32API)
 #      define _LIBCPP_HAS_THREAD_API_WIN32
+#    elif defined(__MOLLENOS__)
+#      define _LIBCPP_HAS_THREAD_API_C11
+#      define _LIBCPP_NO_NATIVE_SEMAPHORES
 #    else
 #      error "No thread API"
 #    endif // _LIBCPP_HAS_THREAD_API

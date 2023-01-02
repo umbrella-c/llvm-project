@@ -1323,9 +1323,10 @@ static llvm::Constant *buildGlobalBlock(CodeGenModule &CGM,
 
   bool IsOpenCL = CGM.getLangOpts().OpenCL;
   bool IsWindows = CGM.getTarget().getTriple().isOSWindows();
+  bool IsVali = CGM.getTarget().getTriple().isOSVali();
   if (!IsOpenCL) {
     // isa
-    if (IsWindows)
+    if (IsWindows || IsVali)
       fields.addNullPointer(CGM.Int8PtrPtrTy);
     else
       fields.add(CGM.getNSConcreteGlobalBlock());
@@ -2824,7 +2825,7 @@ static void configureBlocksRuntimeObject(CodeGenModule &CGM,
                                          llvm::Constant *C) {
   auto *GV = cast<llvm::GlobalValue>(C->stripPointerCasts());
 
-  if (CGM.getTarget().getTriple().isOSBinFormatCOFF()) {
+  if (CGM.getTarget().getTriple().isOSBinFormatCOFF() || CGM.getTarget().getTriple().isOSBinFormatVPE()) {
     IdentifierInfo &II = CGM.getContext().Idents.get(C->getName());
     TranslationUnitDecl *TUDecl = CGM.getContext().getTranslationUnitDecl();
     DeclContext *DC = TranslationUnitDecl::castToDeclContext(TUDecl);

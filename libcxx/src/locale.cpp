@@ -39,7 +39,7 @@
 
 #if defined(_LIBCPP_MSVCRT) || defined(__MINGW32__)
 #   include "__support/win32/locale_win32.h"
-#elif !defined(__BIONIC__) && !defined(__NuttX__)
+#elif !defined(__BIONIC__) && !defined(__NuttX__) && !defined(__MOLLENOS__)
 #   include <langinfo.h>
 #endif
 
@@ -1195,6 +1195,9 @@ ctype<char>::classic_table() noexcept
     return __pctype_func();
 #elif defined(__EMSCRIPTEN__)
     return *__ctype_b_loc();
+#elif defined(MOLLENOS)
+    // Same as newlib has a 257-entry table in ctype_.c, where (char)0 starts at [1].
+    return _ctype_ + 1;
 #elif defined(_NEWLIB_VERSION)
     // Newlib has a 257-entry table in ctype_.c, where (char)0 starts at [1].
     return _ctype_ + 1;

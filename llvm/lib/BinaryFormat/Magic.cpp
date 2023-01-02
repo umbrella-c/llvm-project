@@ -14,7 +14,7 @@
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/MemoryBuffer.h"
 
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(MOLLENOS)
 #include <unistd.h>
 #else
 #include <io.h>
@@ -221,6 +221,12 @@ file_magic llvm::identify_magic(StringRef Magic) {
       return file_magic::pdb;
     if (startswith(Magic, "MDMP"))
       return file_magic::minidump;
+    break;
+
+  case 'V': // VPE
+    if (startswith(Magic, "VPE\x00")) {
+      return file_magic::vpe_executable;
+    }
     break;
 
   case 0x64: // x86-64 or ARM64 Windows.

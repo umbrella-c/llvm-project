@@ -25,6 +25,18 @@ if (LIBCXXABI_ENABLE_NEW_DELETE_DEFINITIONS)
   )
 endif()
 
+if (MOLLENOS)
+  set(LIBCXXABI_SOURCES_SHARED
+    bootstrap/debug.cpp
+    bootstrap/exception_pointer.cpp
+    bootstrap/exception.cpp
+    bootstrap/memory.cpp
+    bootstrap/stdexcept_default.cpp
+    bootstrap/variant.cpp
+    main.cpp
+  )
+endif()
+
 if (LIBCXXABI_ENABLE_EXCEPTIONS)
   list(APPEND LIBCXXABI_SOURCES
     cxa_exception.cpp
@@ -287,6 +299,11 @@ if (LIBCXXABI_ENABLE_STATIC)
       LINK_FLAGS "${LIBCXXABI_LINK_FLAGS}"
       OUTPUT_NAME "${LIBCXXABI_STATIC_OUTPUT_NAME}"
     )
+  
+    if(MOLLENOS)
+    target_compile_options(cxxabi_static PRIVATE -fstatic-runtime-cxx)
+  endif()
+  
   target_link_libraries(cxxabi_static
     PUBLIC cxxabi_static_objects
     PRIVATE ${LIBCXXABI_STATIC_LIBRARIES} ${LIBCXXABI_LIBRARIES})
@@ -304,11 +321,20 @@ endif()
 add_custom_target(cxxabi DEPENDS ${LIBCXXABI_BUILD_TARGETS})
 
 if (LIBCXXABI_INSTALL_LIBRARY)
+  set(export_to_llvmexports)
+  if (LLVM_BOOTSTRAP_RUNTIME)
+    set(export_to_llvmexports EXPORT LLVMExports)
+  endif()
   install(TARGETS ${LIBCXXABI_INSTALL_TARGETS}
+    ${export_to_llvmexports}
+    RUNTIME DESTINATION ${LIBCXXABI_INSTALL_PREFIX}bin COMPONENT cxxabi
     LIBRARY DESTINATION ${LIBCXXABI_INSTALL_LIBRARY_DIR} COMPONENT cxxabi
     ARCHIVE DESTINATION ${LIBCXXABI_INSTALL_LIBRARY_DIR} COMPONENT cxxabi
     RUNTIME DESTINATION ${LIBCXXABI_INSTALL_RUNTIME_DIR} COMPONENT cxxabi
     )
+  if (LLVM_BOOTSTRAP_RUNTIME)
+    set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS ${LIBCXXABI_INSTALL_TARGETS})
+  endif()
 endif()
 
 if (NOT CMAKE_CONFIGURATION_TYPES AND LIBCXXABI_INSTALL_LIBRARY)

@@ -455,7 +455,8 @@ MCTargetStreamer *llvm::createX86AsmTargetStreamer(MCStreamer &S,
 MCTargetStreamer *
 llvm::createX86ObjectTargetStreamer(MCStreamer &S, const MCSubtargetInfo &STI) {
   // No need to register a target streamer.
-  if (!STI.getTargetTriple().isOSBinFormatCOFF())
+  bool IsVPEOrCOFF = STI.getTargetTriple().isOSBinFormatVPE() || STI.getTargetTriple().isOSBinFormatCOFF();
+  if (!IsVPEOrCOFF)
     return nullptr;
   // Registers itself to the MCStreamer.
   return new X86WinCOFFTargetStreamer(S);

@@ -813,7 +813,7 @@ unsigned ExegesisX86Target::getScratchMemoryRegister(const Triple &TT) const {
     // add some additional setup code.
     return 0;
   }
-  return TT.isOSWindows() ? X86::RCX : X86::RDI;
+  return (TT.isOSWindows() || TT.isOSVali()) ? X86::RCX : X86::RDI;
 }
 
 unsigned ExegesisX86Target::getLoopCounterRegister(const Triple &TT) const {

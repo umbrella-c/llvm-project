@@ -28,6 +28,8 @@
     #define _LIBUNWIND_SUPPORT_COMPACT_UNWIND 1
     #define _LIBUNWIND_SUPPORT_DWARF_UNWIND 1
   #endif
+#elif defined(MOLLENOS)
+#define _LIBUNWIND_SUPPORT_DWARF_UNWIND 1
 #elif defined(_WIN32)
   #ifdef __SEH__
     #define _LIBUNWIND_SUPPORT_SEH_UNWIND 1
@@ -87,7 +89,7 @@
 #define _LIBUNWIND_WEAK_ALIAS(name, aliasname)                                 \
   extern "C" _LIBUNWIND_EXPORT __typeof(name) aliasname                        \
       __attribute__((weak, alias(#name)));
-#elif defined(_WIN32)
+#elif defined(_WIN32) || defined(MOLLENOS)
 #if defined(__MINGW32__)
 #define _LIBUNWIND_WEAK_ALIAS(name, aliasname)                                 \
   extern "C" _LIBUNWIND_EXPORT __typeof(name) aliasname                        \

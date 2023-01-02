@@ -1431,7 +1431,7 @@ tools::ParsePICArgs(const ToolChain &ToolChain, const ArgList &Args) {
                                     options::OPT_fpic, options::OPT_fno_pic,
                                     options::OPT_fPIE, options::OPT_fno_PIE,
                                     options::OPT_fpie, options::OPT_fno_pie);
-  if (Triple.isOSWindows() && !Triple.isOSCygMing() && LastPICArg &&
+  if ((Triple.isOSWindows() || Triple.isOSVali()) && !Triple.isOSCygMing() && LastPICArg &&
       LastPICArg == Args.getLastArg(options::OPT_fPIC, options::OPT_fpic,
                                     options::OPT_fPIE, options::OPT_fpie)) {
     ToolChain.getDriver().Diag(diag::err_drv_unsupported_opt_for_target)
@@ -1697,7 +1697,9 @@ static void AddUnwindLibrary(const ToolChain &TC, const Driver &D,
   bool AsNeeded = LGT == LibGccType::UnspecifiedLibGcc &&
                   (UNW == ToolChain::UNW_CompilerRT || !D.CCCIsCXX()) &&
                   !TC.getTriple().isAndroid() &&
-                  !TC.getTriple().isOSCygMing() && !TC.getTriple().isOSAIX();
+                  !TC.getTriple().isOSCygMing() && 
+                  !TC.getTriple().isOSAIX() &&
+                  !TC.getTriple().isOSVali();
   if (AsNeeded)
     CmdArgs.push_back(getAsNeededOption(TC, true));
 
@@ -1717,6 +1719,12 @@ static void AddUnwindLibrary(const ToolChain &TC, const Driver &D,
       // anything in if -static is specified.
       if (LGT != LibGccType::StaticLibGcc)
         CmdArgs.push_back("-lunwind");
+    } else if (TC.getTriple().isOSVali()) {
+      if (LGT == LibGccType::StaticLibGcc)
+        CmdArgs.push_back("unwind.lib");
+      else {
+        CmdArgs.push_back("unwind.dll.lib");
+      }
     } else if (LGT == LibGccType::StaticLibGcc) {
       CmdArgs.push_back("-l:libunwind.a");
     } else if (LGT == LibGccType::SharedLibGcc) {

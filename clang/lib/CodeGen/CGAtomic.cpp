@@ -321,9 +321,10 @@ static RValue emitAtomicLibcall(CodeGenFunction &CGF,
   fnAttrB.addAttribute(llvm::Attribute::WillReturn);
   llvm::AttributeList fnAttrs = llvm::AttributeList::get(
       CGF.getLLVMContext(), llvm::AttributeList::FunctionIndex, fnAttrB);
+  bool isVali = CGF.getTarget().getTriple().isOSVali();
 
   llvm::FunctionCallee fn =
-      CGF.CGM.CreateRuntimeFunction(fnTy, fnName, fnAttrs);
+      CGF.CGM.CreateRuntimeFunction(fnTy, fnName, fnAttrs, isVali);
   auto callee = CGCallee::forDirect(fn);
   return CGF.EmitCall(fnInfo, callee, ReturnValueSlot(), args);
 }

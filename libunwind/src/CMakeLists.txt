@@ -22,6 +22,10 @@ set(LIBUNWIND_C_SOURCES
     UnwindLevel1-gcc-ext.c
     Unwind-sjlj.c
     )
+if(MOLLENOS)
+  list(APPEND LIBUNWIND_C_SOURCES main.c)
+endif()
+
 set_source_files_properties(${LIBUNWIND_C_SOURCES}
                             PROPERTIES
                               COMPILE_FLAGS "-std=c99")
@@ -35,7 +39,7 @@ set(LIBUNWIND_ASM_SOURCES
 # CMake doesn't work correctly with assembly on AIX. Workaround by compiling
 # as C files as well.
 if((APPLE AND CMAKE_VERSION VERSION_LESS 3.19) OR
-   (MINGW AND CMAKE_VERSION VERSION_LESS 3.17) OR
+   ((MINGW OR MOLLENOS) AND CMAKE_VERSION VERSION_LESS 3.17) OR
    (${CMAKE_SYSTEM_NAME} MATCHES "AIX"))
   set_source_files_properties(${LIBUNWIND_ASM_SOURCES} PROPERTIES LANGUAGE C)
 endif()
@@ -214,10 +218,17 @@ endif()
 add_custom_target(unwind DEPENDS ${LIBUNWIND_BUILD_TARGETS})
 
 if (LIBUNWIND_INSTALL_LIBRARY)
+  set(export_to_llvmexports)
+  if (LLVM_BOOTSTRAP_RUNTIME)
+    set(export_to_llvmexports EXPORT LLVMExports)
+  endif()
   install(TARGETS ${LIBUNWIND_INSTALL_TARGETS}
     LIBRARY DESTINATION ${LIBUNWIND_INSTALL_LIBRARY_DIR} COMPONENT unwind
     ARCHIVE DESTINATION ${LIBUNWIND_INSTALL_LIBRARY_DIR} COMPONENT unwind
     RUNTIME DESTINATION ${LIBUNWIND_INSTALL_RUNTIME_DIR} COMPONENT unwind)
+  if (LLVM_BOOTSTRAP_RUNTIME)
+    set_property(GLOBAL APPEND PROPERTY LLVMExports ${LIBUNWIND_INSTALL_TARGETS})
+  endif()
 endif()
 
 if (NOT CMAKE_CONFIGURATION_TYPES AND LIBUNWIND_INSTALL_LIBRARY)

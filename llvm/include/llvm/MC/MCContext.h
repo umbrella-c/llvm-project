@@ -87,6 +87,7 @@ public:
     IsSPIRV,
     IsWasm,
     IsXCOFF,
+    IsVPE,
     IsDXContainer
   };
 

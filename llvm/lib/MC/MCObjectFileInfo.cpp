@@ -23,6 +23,7 @@
 #include "llvm/MC/MCSectionSPIRV.h"
 #include "llvm/MC/MCSectionWasm.h"
 #include "llvm/MC/MCSectionXCOFF.h"
+#include "llvm/MC/MCSectionVPE.h"
 #include "llvm/Support/Casting.h"
 
 using namespace llvm;
@@ -1025,6 +1026,170 @@ void MCObjectFileInfo::initXCOFFMCObjectFileInfo(const Triple &T) {
       /* MultiSymbolsAllowed */ true, ".dwmac", XCOFF::SSUBTYP_DWMAC);
 }
 
+void MCObjectFileInfo::initVPEMCObjectFileInfo(const Triple &T) {
+
+  // Set the `IMAGE_SCN_MEM_16BIT` flag when compiling for thumb mode.  This is
+  // used to indicate to the linker that the text segment contains thumb instructions
+  // and to set the ISA selection bit for calls accordingly.
+  const bool IsThumb = T.getArch() == Triple::thumb;
+  const unsigned DebugTypeSection = COFF::IMAGE_SCN_MEM_DISCARDABLE |
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ;
+  
+  // Required sections we must implement
+  TextSection = Ctx->getVPESection(".text",
+    (IsThumb ? COFF::IMAGE_SCN_MEM_16BIT : (COFF::SectionCharacteristics)0) |
+      COFF::IMAGE_SCN_CNT_CODE | COFF::IMAGE_SCN_MEM_EXECUTE | COFF::IMAGE_SCN_MEM_READ,
+    SectionKind::getText());
+  
+  DataSection = Ctx->getVPESection(".data",
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ |
+      COFF::IMAGE_SCN_MEM_WRITE,
+    SectionKind::getData());
+      
+  BSSSection = Ctx->getVPESection(".bss",
+    COFF::IMAGE_SCN_CNT_UNINITIALIZED_DATA |
+      COFF::IMAGE_SCN_MEM_READ | COFF::IMAGE_SCN_MEM_WRITE,
+    SectionKind::getBSS());
+
+  ReadOnlySection = Ctx->getVPESection(".rdata",
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ,
+  SectionKind::getReadOnly());
+  
+  // Exception handling
+  EHFrameSection = Ctx->getVPESection(".eh_frame",
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+      COFF::IMAGE_SCN_MEM_READ | COFF::IMAGE_SCN_MEM_WRITE,
+    SectionKind::getData());
+  
+  LSDASection = Ctx->getVPESection(".gcc_except_table",
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ,
+    SectionKind::getReadOnly());
+  
+  // Dwarf sections for debug info.  If a target supports debug info, these must
+  // be set.
+  DwarfInfoSection = Ctx->getVPESection(".debug_info",
+    DebugTypeSection, SectionKind::getMetadata(), "section_info");
+  DwarfAbbrevSection = Ctx->getVPESection(".debug_abbrev",
+    DebugTypeSection, SectionKind::getMetadata(), "section_abbrev");
+  DwarfLineSection = Ctx->getVPESection(".debug_line",
+    DebugTypeSection, SectionKind::getMetadata(), "section_line");
+  DwarfLineStrSection = Ctx->getVPESection(".debug_line_str",
+    DebugTypeSection, SectionKind::getMetadata(), "section_line_str");
+  DwarfFrameSection = Ctx->getVPESection(".debug_frame",
+    DebugTypeSection, SectionKind::getMetadata());
+  DwarfPubTypesSection = Ctx->getVPESection(".debug_pubtypes",
+    DebugTypeSection, SectionKind::getMetadata());
+  DwarfPubNamesSection = Ctx->getVPESection(".debug_pubnames",
+    DebugTypeSection, SectionKind::getMetadata());
+  DwarfStrSection = Ctx->getVPESection(".debug_str",
+    DebugTypeSection, SectionKind::getMetadata(), "info_string");
+  DwarfLocSection = Ctx->getVPESection(".debug_loc",
+    DebugTypeSection, SectionKind::getMetadata(), "section_debug_loc");
+  DwarfARangesSection = Ctx->getVPESection(".debug_aranges",
+    DebugTypeSection, SectionKind::getMetadata());
+  DwarfRangesSection = Ctx->getVPESection(".debug_ranges",
+    DebugTypeSection, SectionKind::getMetadata(), "debug_range");
+  DwarfMacinfoSection = Ctx->getVPESection(".debug_macinfo",
+    DebugTypeSection, SectionKind::getMetadata(), "debug_macinfo");
+    
+  /// Accelerator table sections. DwarfDebugNamesSection is the DWARF v5
+  /// accelerator table, while DwarfAccelNamesSection, DwarfAccelObjCSection,
+  /// DwarfAccelNamespaceSection, DwarfAccelTypesSection are pre-DWARF v5
+  /// extensions.
+  DwarfDebugNamesSection = Ctx->getVPESection(".debug_names",
+    DebugTypeSection, SectionKind::getMetadata(), "debug_names_begin");
+  DwarfAccelNamesSection = Ctx->getVPESection(".apple_names",
+    DebugTypeSection, SectionKind::getMetadata(), "names_begin");
+  DwarfAccelObjCSection = Ctx->getVPESection(".apple_objc",
+    DebugTypeSection, SectionKind::getMetadata(), "objc_begin");
+  DwarfAccelNamespaceSection = Ctx->getVPESection(".apple_namespaces",
+    DebugTypeSection, SectionKind::getMetadata(), "namespac_begin");
+  DwarfAccelTypesSection = Ctx->getVPESection(".apple_types",
+    DebugTypeSection, SectionKind::getMetadata(), "types_begin");
+  
+  // These are used for the Fission separate debug information files.
+  DwarfInfoDWOSection = Ctx->getVPESection(".debug_info.dwo",
+    DebugTypeSection, SectionKind::getMetadata(), "section_info_dwo");
+  DwarfTypesDWOSection = Ctx->getVPESection(".debug_types.dwo",
+    DebugTypeSection, SectionKind::getMetadata(), "section_types_dwo");
+  DwarfAbbrevDWOSection = Ctx->getVPESection(".debug_abbrev.dwo",
+    DebugTypeSection, SectionKind::getMetadata(), "section_abbrev_dwo");
+  DwarfStrDWOSection = Ctx->getVPESection(".debug_str.dwo",
+    DebugTypeSection, SectionKind::getMetadata(), "skel_string");
+  DwarfLineDWOSection = Ctx->getVPESection(".debug_line.dwo",
+    DebugTypeSection, SectionKind::getMetadata());
+  DwarfLocDWOSection = Ctx->getVPESection(".debug_loc.dwo",
+    DebugTypeSection, SectionKind::getMetadata(), "skel_loc");
+  DwarfStrOffDWOSection = Ctx->getVPESection(".debug_str_offsets.dwo",
+    DebugTypeSection, SectionKind::getMetadata(), "section_str_off_dwo");
+  
+  // I don't think these are neccessary for us
+  DwarfGnuPubNamesSection = Ctx->getVPESection(".debug_gnu_pubnames",
+    DebugTypeSection, SectionKind::getMetadata());
+  DwarfGnuPubTypesSection = Ctx->getVPESection(".debug_gnu_pubtypes",
+    DebugTypeSection, SectionKind::getMetadata());
+
+  /// The DWARF v5 string offset and address table sections.
+  DwarfStrOffSection = Ctx->getVPESection(".debug_str_offsets",
+    DebugTypeSection, SectionKind::getMetadata(), "section_str_off");
+  DwarfAddrSection = Ctx->getVPESection(".debug_addr",
+    DebugTypeSection, SectionKind::getMetadata(), "addr_sec");
+  
+  /// The DWARF v5 range list section.
+  DwarfRnglistsSection = Ctx->getVPESection(".debug_rnglists", 
+    DebugTypeSection, SectionKind::getMetadata(), "section_rng_lists");
+    
+  /// The DWARF v5 locations list section.
+  DwarfLoclistsSection = Ctx->getVPESection(".debug_loclists", 
+    DebugTypeSection, SectionKind::getMetadata(), "section_loc_lists");
+
+  /// The DWARF v5 range list section for fission.
+  DwarfRnglistsDWOSection = Ctx->getVPESection(".debug_rnglists.dwo",
+    DebugTypeSection, SectionKind::getMetadata(), "section_rng_lists_dwo");
+
+  // These are for Fission DWP files.
+  DwarfCUIndexSection = Ctx->getVPESection(".debug_cu_index",
+    DebugTypeSection, SectionKind::getMetadata());
+  DwarfTUIndexSection = Ctx->getVPESection(".debug_tu_index",
+    DebugTypeSection, SectionKind::getMetadata());
+
+  /// Section directive for Thread Local data. ELF, MachO, COFF, and Wasm.
+  TLSDataSection = Ctx->getVPESection(".tls$",
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ |
+      COFF::IMAGE_SCN_MEM_WRITE,
+    SectionKind::getData());
+
+  /// StackMap section.
+  StackMapSection = Ctx->getVPESection(".llvm_stackmaps",
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ,
+  SectionKind::getReadOnly());
+
+  /// FaultMap section.
+  FaultMapSection = Ctx->getVPESection(".llvm_faultmaps",
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ,
+  SectionKind::getReadOnly());
+
+  /// COFF specific sections.
+  DrectveSection = Ctx->getVPESection(".drectve",
+    COFF::IMAGE_SCN_LNK_INFO | COFF::IMAGE_SCN_LNK_REMOVE,
+    SectionKind::getMetadata());
+
+  PDataSection = Ctx->getVPESection(".pdata",
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ,
+    SectionKind::getData());
+
+  XDataSection = Ctx->getVPESection(".xdata",
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ,
+    SectionKind::getData());
+
+  SXDataSection = Ctx->getVPESection(".sxdata",
+    COFF::IMAGE_SCN_LNK_INFO, SectionKind::getMetadata());
+
+  GFIDsSection = Ctx->getVPESection(".gfids$y",
+    COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ,
+    SectionKind::getMetadata());
+}
+
 void MCObjectFileInfo::initDXContainerObjectFileInfo(const Triple &T) {
   // At the moment the DXBC section should end up empty.
   TextSection = Ctx->getDXContainerSection("DXBC", SectionKind::getText());
@@ -1076,6 +1241,9 @@ void MCObjectFileInfo::initMCObjectFileInfo(MCContext &MCCtx, bool PIC,
   case MCContext::IsXCOFF:
     initXCOFFMCObjectFileInfo(TheTriple);
     break;
+  case MCContext::IsVPE:
+    initVPEMCObjectFileInfo(TheTriple);
+    break;
   case MCContext::IsDXContainer:
     initDXContainerObjectFileInfo(TheTriple);
     break;
@@ -1091,6 +1259,8 @@ MCSection *MCObjectFileInfo::getDwarfComdatSection(const char *Name,
   case Triple::Wasm:
     return Ctx->getWasmSection(Name, SectionKind::getMetadata(), 0,
                                utostr(Hash), MCContext::GenericSectionID);
+  case Triple::VPE:
+    return Ctx->getVPESection(Name);
   case Triple::MachO:
   case Triple::COFF:
   case Triple::GOFF:

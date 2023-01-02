@@ -32,6 +32,9 @@
 #if defined(HAVE_UNISTD_H)
 # include <unistd.h>
 #endif
+#if defined(LLVM_ON_VALI)
+# include <io.h>
+#endif
 #if defined(_MSC_VER)
 # include <io.h>
 # include <fcntl.h>

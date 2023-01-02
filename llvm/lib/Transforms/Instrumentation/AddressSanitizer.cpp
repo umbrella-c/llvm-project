@@ -1900,6 +1900,7 @@ bool ModuleAddressSanitizer::ShouldUseMachOGlobalsSection() const {
 
 StringRef ModuleAddressSanitizer::getGlobalMetadataSection() const {
   switch (TargetTriple.getObjectFormat()) {
+  case Triple::VPE:   return ".ASAN$GL";
   case Triple::COFF:  return ".ASAN$GL";
   case Triple::ELF:   return "asan_globals";
   case Triple::MachO: return "__DATA,__asan_globals,regular";

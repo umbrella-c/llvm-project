@@ -132,6 +132,7 @@ endif()
 
 if(WIN32)
   set(LLVM_HAVE_LINK_VERSION_SCRIPT 0)
+  set(LLVM_ON_VALI 0)
   if(CYGWIN)
     set(LLVM_ON_WIN32 0)
     set(LLVM_ON_UNIX 1)
@@ -139,7 +140,12 @@ if(WIN32)
     set(LLVM_ON_WIN32 1)
     set(LLVM_ON_UNIX 0)
   endif(CYGWIN)
-else(WIN32)
+elseif(MOLLENOS)
+  set(LLVM_ON_WIN32 0)
+  set(LLVM_ON_UNIX 0)
+  set(LLVM_ON_VALI 1)
+else()
+  set(LLVM_ON_VALI 0)
   if(FUCHSIA OR UNIX)
     set(LLVM_ON_WIN32 0)
     set(LLVM_ON_UNIX 1)
@@ -230,7 +236,8 @@ endif()
 # build might work on ELF but fail on MachO/COFF.
 if(NOT (CMAKE_SYSTEM_NAME MATCHES "Darwin|FreeBSD|OpenBSD|DragonFly|AIX|OS390" OR
         WIN32 OR CYGWIN) AND
-   NOT LLVM_USE_SANITIZER)
+   NOT LLVM_USE_SANITIZER AND
+   NOT MOLLENOS)
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,defs")
 endif()
 
@@ -318,7 +325,7 @@ if( LLVM_USE_LINKER )
   append("-fuse-ld=${LLVM_USE_LINKER}"
     CMAKE_EXE_LINKER_FLAGS CMAKE_MODULE_LINKER_FLAGS CMAKE_SHARED_LINKER_FLAGS)
   check_cxx_source_compiles("int main() { return 0; }" CXX_SUPPORTS_CUSTOM_LINKER)
-  if ( NOT CXX_SUPPORTS_CUSTOM_LINKER )
+  if ( NOT CXX_SUPPORTS_CUSTOM_LINKER AND NOT MOLLENOS )
     message(FATAL_ERROR "Host compiler does not support '-fuse-ld=${LLVM_USE_LINKER}'")
   endif()
 endif()
@@ -328,7 +335,7 @@ if( LLVM_ENABLE_PIC )
     # Xcode has -mdynamic-no-pic on by default, which overrides -fPIC. I don't
     # know how to disable this, so just force ENABLE_PIC off for now.
     message(WARNING "-fPIC not supported with Xcode.")
-  elseif( WIN32 OR CYGWIN)
+  elseif( WIN32 OR CYGWIN OR MOLLENOS)
     # On Windows all code is PIC. MinGW warns if -fPIC is used.
   else()
     add_flag_or_print_warning("-fPIC" FPIC)
@@ -1125,6 +1132,9 @@ set(LLVM_THINLTO_CACHE_PATH "${PROJECT_BINARY_DIR}/lto.cache" CACHE STRING "Set 
 
 if(LLVM_ENABLE_LTO AND LLVM_ON_WIN32 AND NOT LINKER_IS_LLD_LINK AND NOT MINGW)
   message(FATAL_ERROR "When compiling for Windows, LLVM_ENABLE_LTO requires using lld as the linker (point CMAKE_LINKER at lld-link.exe)")
+endif()
+if(LLVM_ENABLE_LTO AND LLVM_ON_VALI AND NOT LINKER_IS_LLD_LINK)
+  message(FATAL_ERROR "When compiling for Vali, LLVM_ENABLE_LTO requires using lld as the linker (point CMAKE_LINKER at lld-link.exe)")
 endif()
 if(uppercase_LLVM_ENABLE_LTO STREQUAL "THIN")
   append("-flto=thin" CMAKE_CXX_FLAGS CMAKE_C_FLAGS)

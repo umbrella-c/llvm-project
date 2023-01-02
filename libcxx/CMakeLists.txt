@@ -476,6 +476,10 @@ endif()
 # Configure compiler.
 include(config-ix)
 
+if (LIBCXX_USE_COMPILER_RT AND NOT MOLLENOS)
+  list(APPEND LIBCXX_LINK_FLAGS "-rtlib=compiler-rt")
+endif()
+
 # Configure coverage options.
 if (LIBCXX_GENERATE_COVERAGE)
   include(CodeCoverage)
@@ -894,7 +898,7 @@ endif()
 # By default libc++ on Windows expects to use a shared library, which requires
 # the headers to use DLL import/export semantics. However when building a
 # static library only we modify the headers to disable DLL import/export.
-if (DEFINED WIN32 AND LIBCXX_ENABLE_STATIC AND NOT LIBCXX_ENABLE_SHARED)
+if ((WIN32 OR MOLLENOS) AND LIBCXX_ENABLE_STATIC AND NOT LIBCXX_ENABLE_SHARED)
   message(STATUS "Generating custom __config for non-DLL Windows build")
   config_define(ON _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS)
 endif()

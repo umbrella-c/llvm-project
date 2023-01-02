@@ -153,6 +153,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
       return new NetBSDTargetInfo<AArch64leTargetInfo>(Triple, Opts);
     case llvm::Triple::OpenBSD:
       return new OpenBSDTargetInfo<AArch64leTargetInfo>(Triple, Opts);
+    case llvm::Triple::Vali:
+      return new ValiTargetInfo<AArch64leTargetInfo>(Triple, Opts);
     case llvm::Triple::Win32:
       switch (Triple.getEnvironment()) {
       case llvm::Triple::GNU:
@@ -175,6 +177,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
       return new LinuxTargetInfo<AArch64beTargetInfo>(Triple, Opts);
     case llvm::Triple::NetBSD:
       return new NetBSDTargetInfo<AArch64beTargetInfo>(Triple, Opts);
+    case llvm::Triple::Vali:
+      return new ValiTargetInfo<AArch64beTargetInfo>(Triple, Opts);
     default:
       return new AArch64beTargetInfo(Triple, Opts);
     }
@@ -199,6 +203,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
       return new RTEMSTargetInfo<ARMleTargetInfo>(Triple, Opts);
     case llvm::Triple::NaCl:
       return new NaClTargetInfo<ARMleTargetInfo>(Triple, Opts);
+    case llvm::Triple::Vali:
+      return new ValiTargetInfo<ARMleTargetInfo>(Triple, Opts);
     case llvm::Triple::Win32:
       switch (Triple.getEnvironment()) {
       case llvm::Triple::Cygnus:
@@ -233,6 +239,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
       return new RTEMSTargetInfo<ARMbeTargetInfo>(Triple, Opts);
     case llvm::Triple::NaCl:
       return new NaClTargetInfo<ARMbeTargetInfo>(Triple, Opts);
+    case llvm::Triple::Vali:
+      return new ValiTargetInfo<ARMbeTargetInfo>(Triple, Opts);
     default:
       return new ARMbeTargetInfo(Triple, Opts);
     }
@@ -256,6 +264,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
       return new FreeBSDTargetInfo<MipsTargetInfo>(Triple, Opts);
     case llvm::Triple::NetBSD:
       return new NetBSDTargetInfo<MipsTargetInfo>(Triple, Opts);
+    case llvm::Triple::Vali:
+      return new ValiTargetInfo<MipsTargetInfo>(Triple, Opts);
     default:
       return new MipsTargetInfo(Triple, Opts);
     }
@@ -272,6 +282,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
       return new NetBSDTargetInfo<MipsTargetInfo>(Triple, Opts);
     case llvm::Triple::NaCl:
       return new NaClTargetInfo<NaClMips32TargetInfo>(Triple, Opts);
+    case llvm::Triple::Vali:
+      return new ValiTargetInfo<MipsTargetInfo>(Triple, Opts);
     default:
       return new MipsTargetInfo(Triple, Opts);
     }
@@ -288,6 +300,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
       return new NetBSDTargetInfo<MipsTargetInfo>(Triple, Opts);
     case llvm::Triple::OpenBSD:
       return new OpenBSDTargetInfo<MipsTargetInfo>(Triple, Opts);
+    case llvm::Triple::Vali:
+      return new ValiTargetInfo<MipsTargetInfo>(Triple, Opts);
     default:
       return new MipsTargetInfo(Triple, Opts);
     }
@@ -304,6 +318,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
       return new NetBSDTargetInfo<MipsTargetInfo>(Triple, Opts);
     case llvm::Triple::OpenBSD:
       return new OpenBSDTargetInfo<MipsTargetInfo>(Triple, Opts);
+    case llvm::Triple::Vali:
+      return new ValiTargetInfo<MipsTargetInfo>(Triple, Opts);
     default:
       return new MipsTargetInfo(Triple, Opts);
     }
@@ -520,6 +536,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
       return new MinixTargetInfo<X86_32TargetInfo>(Triple, Opts);
     case llvm::Triple::Solaris:
       return new SolarisTargetInfo<X86_32TargetInfo>(Triple, Opts);
+    case llvm::Triple::Vali:
+      return new ValiX86_32TargetInfo(Triple, Opts);
     case llvm::Triple::Win32: {
       switch (Triple.getEnvironment()) {
       case llvm::Triple::Cygnus:
@@ -577,6 +595,8 @@ TargetInfo *AllocateTarget(const llvm::Triple &Triple,
       return new KFreeBSDTargetInfo<X86_64TargetInfo>(Triple, Opts);
     case llvm::Triple::Solaris:
       return new SolarisTargetInfo<X86_64TargetInfo>(Triple, Opts);
+    case llvm::Triple::Vali:
+      return new ValiX86_64TargetInfo(Triple, Opts);
     case llvm::Triple::Win32: {
       switch (Triple.getEnvironment()) {
       case llvm::Triple::Cygnus:

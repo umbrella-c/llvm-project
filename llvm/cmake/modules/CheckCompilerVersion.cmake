@@ -74,6 +74,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(OLD_CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS})
     set(OLD_CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES})
     set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -std=c++0x")
+    if(MOLLENOS)
+      set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} ${CMAKE_CXX_FLAGS} -S")
+    endif()
     check_cxx_source_compiles("
 #include <iosfwd>
 #if defined(__GLIBCXX__)

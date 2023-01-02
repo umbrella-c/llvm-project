@@ -460,7 +460,7 @@ static bool useFramePointerForTargetByDefault(const ArgList &Args,
     break;
   }
 
-  if (Triple.isOSFuchsia() || Triple.isOSNetBSD()) {
+  if (Triple.isOSFuchsia() || Triple.isOSNetBSD() || Triple.isOSVali()) {
     return !areOptimizationsEnabled(Args);
   }
 
@@ -2486,8 +2486,9 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
         continue;
       }
 
-      if (C.getDefaultToolChain().getTriple().isOSBinFormatCOFF() &&
-          Value == "-mbig-obj")
+      bool IsVPEOrCOFF = C.getDefaultToolChain().getTriple().isOSBinFormatCOFF() || 
+                         C.getDefaultToolChain().getTriple().isOSBinFormatVPE();
+      if (IsVPEOrCOFF && Value == "-mbig-obj")
         continue; // LLVM handles bigobj automatically
 
       switch (C.getDefaultToolChain().getArch()) {
@@ -7235,7 +7236,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   if (Args.hasFlag(options::OPT_faddrsig, options::OPT_fno_addrsig,
                    (TC.getTriple().isOSBinFormatELF() ||
-                    TC.getTriple().isOSBinFormatCOFF()) &&
+                    TC.getTriple().isOSBinFormatCOFF() ||
+                    TC.getTriple().isOSBinFormatVPE()) &&
                        !TC.getTriple().isPS4() && !TC.getTriple().isVE() &&
                        !TC.getTriple().isOSNetBSD() &&
                        !Distro(D.getVFS(), TC.getTriple()).IsGentoo() &&
@@ -7366,7 +7368,8 @@ ObjCRuntime Clang::AddObjCRuntimeArgs(const ArgList &args,
     if ((runtime.getKind() == ObjCRuntime::GNUstep) &&
         (runtime.getVersion() >= VersionTuple(2, 0)))
       if (!getToolChain().getTriple().isOSBinFormatELF() &&
-          !getToolChain().getTriple().isOSBinFormatCOFF()) {
+          !getToolChain().getTriple().isOSBinFormatCOFF() &&
+          !getToolChain().getTriple().isOSBinFormatVPE()) {
         getToolChain().getDriver().Diag(
             diag::err_drv_gnustep_objc_runtime_incompatible_binary)
           << runtime.getVersion().getMajor();

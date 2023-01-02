@@ -236,6 +236,7 @@ void InitHeaderSearch::AddDefaultCIncludePaths(const llvm::Triple &triple,
     case llvm::Triple::PS4:
     case llvm::Triple::PS5:
     case llvm::Triple::ELFIAMCU:
+    case llvm::Triple::Vali:
     case llvm::Triple::Fuchsia:
       break;
     case llvm::Triple::Win32:
@@ -417,6 +418,7 @@ bool InitHeaderSearch::ShouldAddDefaultIncludePaths(
   case llvm::Triple::OpenBSD:
   case llvm::Triple::Solaris:
   case llvm::Triple::WASI:
+  case llvm::Triple::Vali:
     return false;
 
   case llvm::Triple::Win32:

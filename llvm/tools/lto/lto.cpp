@@ -705,3 +705,9 @@ extern const char *const *lto_runtime_lib_symbols_list(size_t *size) {
   *size = symbols.size();
   return symbols.data();
 }
+
+#ifdef LLVM_ON_VALI
+void dllmain(int action) {
+    (void)action;
+}
+#endif

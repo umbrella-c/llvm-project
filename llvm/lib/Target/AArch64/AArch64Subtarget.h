@@ -266,6 +266,7 @@ public:
   bool isWindowsArm64EC() const { return TargetTriple.isWindowsArm64EC(); }
 
   bool isTargetCOFF() const { return TargetTriple.isOSBinFormatCOFF(); }
+  bool isTargetVPE() const { return TargetTriple.isOSBinFormatVPE(); }
   bool isTargetELF() const { return TargetTriple.isOSBinFormatELF(); }
   bool isTargetMachO() const { return TargetTriple.isOSBinFormatMachO(); }
 

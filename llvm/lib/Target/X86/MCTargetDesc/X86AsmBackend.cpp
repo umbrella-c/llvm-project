@@ -1159,6 +1159,30 @@ public:
   }
 };
 
+class VPEX86AsmBackend : public X86AsmBackend {
+  bool Is64Bit;
+
+public:
+  VPEX86AsmBackend(const Target &T, bool is64Bit,
+                       const MCSubtargetInfo &STI)
+    : X86AsmBackend(T, STI)
+    , Is64Bit(is64Bit) {
+  }
+
+  Optional<MCFixupKind> getFixupKind(StringRef Name) const override {
+    return StringSwitch<Optional<MCFixupKind>>(Name)
+        .Case("dir32", FK_Data_4)
+        .Case("secrel32", FK_SecRel_4)
+        .Case("secidx", FK_SecRel_2)
+        .Default(MCAsmBackend::getFixupKind(Name));
+  }
+
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override {
+    return createX86VPEObjectWriter(Is64Bit);
+  }
+};
+
 namespace CU {
 
   /// Compact unwind encoding values.
@@ -1522,6 +1546,9 @@ MCAsmBackend *llvm::createX86_32AsmBackend(const Target &T,
   if (TheTriple.isOSWindows() && TheTriple.isOSBinFormatCOFF())
     return new WindowsX86AsmBackend(T, false, STI);
 
+  if (TheTriple.isOSBinFormatVPE())
+    return new VPEX86AsmBackend(T, false, STI);
+
   uint8_t OSABI = MCELFObjectTargetWriter::getOSABI(TheTriple.getOS());
 
   if (TheTriple.isOSIAMCU())
@@ -1540,6 +1567,9 @@ MCAsmBackend *llvm::createX86_64AsmBackend(const Target &T,
 
   if (TheTriple.isOSWindows() && TheTriple.isOSBinFormatCOFF())
     return new WindowsX86AsmBackend(T, true, STI);
+
+  if (TheTriple.isOSBinFormatVPE())
+    return new VPEX86AsmBackend(T, true, STI);
 
   uint8_t OSABI = MCELFObjectTargetWriter::getOSABI(TheTriple.getOS());
 

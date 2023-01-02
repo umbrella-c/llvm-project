@@ -163,6 +163,11 @@ uint32_t PlatformThreadID() {
   static_assert(sizeof(pid_t) == sizeof(uint32_t), "");
   return static_cast<uint32_t>(syscall(SYS_gettid));
 }
+#elif defined(_LIBCPP_HAS_THREAD_API_C11)
+uint32_t PlatformThreadID() {
+  static_assert(sizeof(thrd_t) == sizeof(uint32_t), "");
+  return static_cast<uint32_t>(thrd_current());
+}
 #else
 constexpr uint32_t (*PlatformThreadID)() = nullptr;
 #endif

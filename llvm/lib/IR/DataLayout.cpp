@@ -157,6 +157,8 @@ const char *DataLayout::getManglingComponent(const Triple &T) {
     return "-m:o";
   if (T.isOSWindows() && T.isOSBinFormatCOFF())
     return T.getArch() == Triple::x86 ? "-m:x" : "-m:w";
+  if (T.isOSBinFormatVPE())
+    return T.getArch() == Triple::x86 ? "-m:x" : "-m:w";
   if (T.isOSBinFormatXCOFF())
     return "-m:a";
   return "-m:e";

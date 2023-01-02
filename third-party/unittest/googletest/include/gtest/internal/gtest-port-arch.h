@@ -106,6 +106,8 @@
 # define GTEST_OS_QNX 1
 #elif defined(__HAIKU__)
 #define GTEST_OS_HAIKU 1
+#elif defined(MOLLENOS)
+#define GTEST_OS_VALI 1
 #endif  // __CYGWIN__
 
 #endif  // GTEST_INCLUDE_GTEST_INTERNAL_GTEST_PORT_ARCH_H_

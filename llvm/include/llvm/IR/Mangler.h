@@ -52,6 +52,12 @@ void emitLinkerFlagsForGlobalCOFF(raw_ostream &OS, const GlobalValue *GV,
 void emitLinkerFlagsForUsedCOFF(raw_ostream &OS, const GlobalValue *GV,
                                 const Triple &T, Mangler &M);
 
+void emitLinkerFlagsForGlobalVPE(raw_ostream &OS, const GlobalValue *GV,
+                                 const Triple &TT, Mangler &Mangler);
+
+void emitLinkerFlagsForUsedVPE(raw_ostream &OS, const GlobalValue *GV,
+                                const Triple &T, Mangler &M);
+
 } // End llvm namespace
 
 #endif

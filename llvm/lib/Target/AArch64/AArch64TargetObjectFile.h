@@ -52,6 +52,9 @@ public:
 /// This implementation is used for AArch64 COFF targets.
 class AArch64_COFFTargetObjectFile : public TargetLoweringObjectFileCOFF {};
 
+/// This implementation is used for AArch64 VPE targets.
+class AArch64_VPETargetObjectFile : public TargetLoweringObjectFileVPE {};
+
 } // end namespace llvm
 
 #endif

@@ -1234,7 +1234,7 @@ public:
   /// Does this target aim for semantic compatibility with
   /// Microsoft C++ code using dllimport/export attributes?
   virtual bool shouldDLLImportComdatSymbols() const {
-    return getTriple().isWindowsMSVCEnvironment() ||
+    return getTriple().isWindowsMSVCEnvironment() || getTriple().isOSVali() ||
            getTriple().isWindowsItaniumEnvironment() || getTriple().isPS();
   }
 

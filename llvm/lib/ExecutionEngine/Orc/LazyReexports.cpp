@@ -136,7 +136,7 @@ createLocalLazyCallThroughManager(const Triple &T, ExecutionSession &ES,
                                                            ErrorHandlerAddr);
 
   case Triple::x86_64:
-    if (T.getOS() == Triple::OSType::Win32)
+    if (T.getOS() == Triple::OSType::Win32 || T.getOS() == Triple::OSType::Vali)
       return LocalLazyCallThroughManager::Create<OrcX86_64_Win32>(
           ES, ErrorHandlerAddr);
     else

@@ -28,6 +28,10 @@
 #include <windows.h>
 #endif
 
+#if defined(__MOLLENOS__)
+#include <os/mollenos.h>
+#endif
+
 #if defined(__ELF__) && defined(_LIBCPP_LINK_PTHREAD_LIB)
 #pragma comment(lib, "pthread")
 #endif
@@ -86,6 +90,20 @@ thread::hardware_concurrency() noexcept
     SYSTEM_INFO info;
     GetSystemInfo(&info);
     return info.dwNumberOfProcessors;
+#elif defined(__MOLLENOS__)
+    OSSystemCPUInfo_t cpuInfo;
+    oserr_t           oserr;
+    size_t            bytesQueried;
+    oserr = OSSystemQuery(
+            OSSYSTEMQUERY_CPUINFO,
+            &cpuInfo,
+            sizeof(OSSystemCPUInfo_t),
+            &bytesQueried
+    );
+    if (oserr != OS_EOK) {
+        return 0;
+    }
+    return cpuInfo.NumberOfActiveCores;
 #else  // defined(CTL_HW) && defined(HW_NCPU)
     // TODO: grovel through /proc or check cpuid on x86 and similar
     // instructions on other architectures.

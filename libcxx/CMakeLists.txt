@@ -310,7 +310,7 @@ option(LIBCXX_CONFIGURE_IDE "Configure libcxx for use within an IDE"
       ${LIBCXX_CONFIGURE_IDE_DEFAULT})
 
 set(LIBCXX_HERMETIC_STATIC_LIBRARY_DEFAULT OFF)
-if (WIN32)
+if (WIN32 OR VALI)
   set(LIBCXX_HERMETIC_STATIC_LIBRARY_DEFAULT ON)
 endif()
 option(LIBCXX_HERMETIC_STATIC_LIBRARY
@@ -837,6 +837,18 @@ function(cxx_add_windows_flags target)
   endif()
 endfunction()
 
+# Vali-related flags =======================================================
+function(cxx_add_vali_flags target)
+  # Clang-cl shared builds don't support the experimental library.
+  # To avoid linker errors the format_error destructor is inlined for the
+  # dylib. Users can never use format in this mode.
+  # TODO FMT Remove when format becomes mainline.
+  if (LIBCXX_ENABLE_SHARED)
+    target_compile_definitions(${target} PRIVATE
+                              _LIBCPP_INLINE_FORMAT_ERROR_DTOR)
+  endif()
+endfunction()
+
 # Configuration file flags =====================================================
 config_define(${LIBCXX_ABI_VERSION} _LIBCPP_ABI_VERSION)
 config_define(${LIBCXX_ABI_NAMESPACE} _LIBCPP_ABI_NAMESPACE)
@@ -894,12 +906,12 @@ endif()
 # By default libc++ on Windows expects to use a shared library, which requires
 # the headers to use DLL import/export semantics. However when building a
 # static library only we modify the headers to disable DLL import/export.
-if (DEFINED WIN32 AND LIBCXX_ENABLE_STATIC AND NOT LIBCXX_ENABLE_SHARED)
+if ((WIN32 OR VALI) AND LIBCXX_ENABLE_STATIC AND NOT LIBCXX_ENABLE_SHARED)
   message(STATUS "Generating custom __config for non-DLL Windows build")
   config_define(ON _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS)
 endif()
 
-if (WIN32 AND LIBCXX_ENABLE_STATIC_ABI_LIBRARY)
+if ((WIN32 OR VALI) AND LIBCXX_ENABLE_STATIC_ABI_LIBRARY)
   # If linking libcxxabi statically into libcxx, skip the dllimport attributes
   # on symbols we refer to from libcxxabi.
   add_definitions(-D_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS)
@@ -910,6 +922,7 @@ function(cxx_add_common_build_flags target)
   cxx_add_basic_build_flags(${target})
   cxx_add_warning_flags(${target})
   cxx_add_windows_flags(${target})
+  cxx_add_vali_flags(${target})
   cxx_add_exception_flags(${target})
   cxx_add_rtti_flags(${target})
   cxx_add_module_flags(${target})

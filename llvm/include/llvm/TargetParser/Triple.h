@@ -178,6 +178,7 @@ public:
     Myriad,
     AMD,
     Mesa,
+    Umbrella,
     SUSE,
     OpenEmbedded,
     LastVendorType = OpenEmbedded
@@ -221,6 +222,7 @@ public:
     HermitCore, // HermitCore Unikernel/Multikernel
     Hurd,       // GNU/Hurd
     WASI,       // Experimental WebAssembly OS
+    Vali,
     Emscripten,
     ShaderModel, // DirectX ShaderModel
     LastOSType = ShaderModel
@@ -287,6 +289,7 @@ public:
     SPIRV,
     Wasm,
     XCOFF,
+    VPE,
   };
 
 private:
@@ -549,6 +552,10 @@ public:
     return getOS() == Triple::Fuchsia;
   }
 
+  bool isOSVali() const {
+    return getOS() == Triple::Vali;
+  }
+
   bool isOSDragonFly() const { return getOS() == Triple::DragonFly; }
 
   bool isOSSolaris() const {
@@ -696,6 +703,11 @@ public:
   /// Tests whether the OS uses the XCOFF binary format.
   bool isOSBinFormatXCOFF() const {
     return getObjectFormat() == Triple::XCOFF;
+  }
+
+  /// Tests whether the OS uses the VPE binary format.
+  bool isOSBinFormatVPE() const {
+    return getObjectFormat() == Triple::VPE;
   }
 
   /// Tests whether the OS uses the DXContainer binary format.
@@ -956,7 +968,7 @@ public:
   }
 
   /// Tests if the environment supports dllimport/export annotations.
-  bool hasDLLImportExport() const { return isOSWindows() || isPS(); }
+  bool hasDLLImportExport() const { return isOSWindows() || isOSVali() || isPS(); }
 
   /// @}
   /// @name Mutators

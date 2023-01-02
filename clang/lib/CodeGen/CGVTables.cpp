@@ -1238,7 +1238,8 @@ bool CodeGenModule::HasHiddenLTOVisibility(const CXXRecordDecl *RD) {
   if (!isExternallyVisible(LV.getLinkage()))
     return true;
 
-  if (getTriple().isOSBinFormatCOFF()) {
+  bool IsVPEOrCOFF = getTriple().isOSBinFormatCOFF() || getTriple().isOSBinFormatVPE();
+  if (IsVPEOrCOFF) {
     if (RD->hasAttr<DLLExportAttr>() || RD->hasAttr<DLLImportAttr>())
       return false;
   } else {

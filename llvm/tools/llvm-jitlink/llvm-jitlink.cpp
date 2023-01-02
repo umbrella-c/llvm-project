@@ -1221,6 +1221,7 @@ static Triple getFirstFileTriple() {
       auto ObjBuffer = ExitOnErr(getFile(InputFile));
       file_magic Magic = identify_magic(ObjBuffer->getBuffer());
       switch (Magic) {
+      case file_magic::vpe_object:
       case file_magic::coff_object:
       case file_magic::elf_relocatable:
       case file_magic::macho_object: {

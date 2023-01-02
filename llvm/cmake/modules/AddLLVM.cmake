@@ -144,6 +144,9 @@ function(add_llvm_symbol_exports target_name export_file)
     else()
       message(FATAL_ERROR "Unsupported Windows toolchain")
     endif()
+    if(MOLLENOS)
+      set(export_file_linker_flag "-Xlinker -def:\"${export_file_linker_flag}\"")
+    endif()
     set_property(TARGET ${target_name} APPEND_STRING PROPERTY
                  LINK_FLAGS " ${export_file_linker_flag}")
   endif()
@@ -289,7 +292,7 @@ function(add_link_opts target_name)
           set_property(TARGET ${target_name} APPEND_STRING PROPERTY
                        LINK_FLAGS " -Wl,-z,discard-unused=sections")
         endif()
-      elseif(NOT MSVC AND NOT CMAKE_SYSTEM_NAME MATCHES "AIX|OS390")
+      elseif(NOT MSVC AND NOT MOLLENOS AND NOT CMAKE_SYSTEM_NAME MATCHES "AIX|OS390")
         # TODO Revisit this later on z/OS.
         set_property(TARGET ${target_name} APPEND_STRING PROPERTY
                      LINK_FLAGS " -Wl,--gc-sections")
@@ -316,7 +319,7 @@ function(set_output_directory target)
 
   # module_dir -- corresponding to LIBRARY_OUTPUT_DIRECTORY.
   # It affects output of add_library(MODULE).
-  if(WIN32 OR CYGWIN)
+  if(WIN32 OR CYGWIN OR MOLLENOS)
     # DLL platform
     set(module_dir ${ARG_BINARY_DIR})
   else()
@@ -681,7 +684,7 @@ function(llvm_add_library name)
     set(libtype PRIVATE)
   endif()
 
-  if(ARG_MODULE AND LLVM_EXPORT_SYMBOLS_FOR_PLUGINS AND ARG_PLUGIN_TOOL AND (WIN32 OR CYGWIN))
+  if(ARG_MODULE AND LLVM_EXPORT_SYMBOLS_FOR_PLUGINS AND ARG_PLUGIN_TOOL AND (WIN32 OR CYGWIN OR MOLLENOS))
     # On DLL platforms symbols are imported from the tool by linking against it.
     set(llvm_libs ${ARG_PLUGIN_TOOL})
   elseif (NOT ARG_COMPONENT_LIB)
@@ -1263,7 +1266,7 @@ function(export_executable_symbols target)
     if(CYGWIN OR MINGW)
       set_target_properties(${target} PROPERTIES IMPORT_SUFFIX ".exe.a")
     endif()
-  elseif(NOT (WIN32 OR CYGWIN))
+  elseif(NOT (WIN32 OR CYGWIN OR MOLLENOS))
     # On Windows auto-exporting everything doesn't work because of the limit on
     # the size of the exported symbol table, but on other platforms we can do
     # it without any trouble.

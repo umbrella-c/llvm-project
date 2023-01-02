@@ -336,7 +336,63 @@ static void uninstallExceptionOrSignalHandlers() {
   }
 }
 
-#else // !_WIN32
+#elif defined(LLVM_ON_VALI) // !_WIN32
+
+#include <signal.h>
+
+static const int Signals[] =
+    { SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGSEGV, SIGTRAP };
+static const unsigned NumSignals = std::size(Signals);
+static __sa_handler_t PrevActions[NumSignals];
+
+static void CrashRecoverySignalHandler(int Signal) {
+  // Lookup the current thread local recovery object.
+  const CrashRecoveryContextImpl *CRCI = getCurrentContext().get();
+
+  if (!CRCI) {
+    // We didn't find a crash recovery context -- this means either we got a
+    // signal on a thread we didn't expect it on, the application got a signal
+    // outside of a crash recovery context, or something else went horribly
+    // wrong.
+    //
+    // Disable crash recovery and raise the signal again. The assumption here is
+    // that the enclosing application will terminate soon, and we won't want to
+    // attempt crash recovery again.
+    //
+    // This call of Disable isn't thread safe, but it doesn't actually matter.
+    CrashRecoveryContext::Disable();
+    raise(Signal);
+
+    // The signal will be thrown once the signal mask is restored.
+    return;
+  }
+  
+  // Return the same error code as if the program crashed, as mentioned in the
+  // section "Exit Status for Commands":
+  // https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xcu_chap02.html
+  int RetCode = 128 + Signal;
+
+  // Don't consider a broken pipe as a crash (see clang/lib/Driver/Driver.cpp)
+  if (Signal == SIGPIPE)
+    RetCode = -1;
+
+  if (CRCI)
+    const_cast<CrashRecoveryContextImpl *>(CRCI)->HandleCrash(RetCode, Signal);
+}
+
+static void installExceptionOrSignalHandlers() {
+  for (unsigned i = 0; i != NumSignals; ++i) {
+    PrevActions[i] = signal(Signals[i], CrashRecoverySignalHandler);
+  }
+}
+
+static void uninstallExceptionOrSignalHandlers() {
+  // Restore the previous signal handlers.
+  for (unsigned i = 0; i != NumSignals; ++i)
+    signal(Signals[i], PrevActions[i]);
+}
+
+#else // !LLVM_ON_VALI
 
 // Generic POSIX implementation.
 //

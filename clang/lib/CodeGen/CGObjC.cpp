@@ -2155,7 +2155,8 @@ static void setARCRuntimeFunctionLinkage(CodeGenModule &CGM, llvm::Value *RTF) {
     // references to the runtime support library.  We don't really
     // permit this to fail, but we need a particular relocation style.
     if (!CGM.getLangOpts().ObjCRuntime.hasNativeARC() &&
-        !CGM.getTriple().isOSBinFormatCOFF()) {
+        !CGM.getTriple().isOSBinFormatCOFF() &&
+        !CGM.getTriple().isOSBinFormatVPE()) {
       F->setLinkage(llvm::Function::ExternalWeakLinkage);
     }
   }

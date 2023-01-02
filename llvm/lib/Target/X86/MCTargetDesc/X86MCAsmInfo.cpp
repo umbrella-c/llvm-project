@@ -150,6 +150,31 @@ X86MCAsmInfoMicrosoftMASM::X86MCAsmInfoMicrosoftMASM(const Triple &Triple)
   AllowAtAtStartOfIdentifier = true;
 }
 
+void X86VPEMCAsmInfo::anchor() { }
+
+X86VPEMCAsmInfo::X86VPEMCAsmInfo(const Triple &Triple) {
+  bool is64Bit = Triple.getArch() == Triple::x86_64;
+
+  // For x86-64 without the x32 ABI, pointer size is 8. For x86 and for x86-64
+  // with the x32 ABI, pointer size remains the default 4.
+  if (is64Bit) {
+    PrivateGlobalPrefix = ".L";
+    PrivateLabelPrefix = ".L";
+    CodePointerSize = 8;
+  }
+  
+  SupportsDebugInformation = true;
+  ExceptionsType = ExceptionHandling::DwarfCFI;
+
+  AssemblerDialect = AsmWriterFlavor;
+  TextAlignFillValue = 0x90;
+  AllowAtInName = true;
+
+  // Always enable the integrated assembler by default.
+  // Clang also enabled it when the OS is Solaris but that is redundant here.
+  UseIntegratedAssembler = true;
+}
+
 void X86MCAsmInfoGNUCOFF::anchor() { }
 
 X86MCAsmInfoGNUCOFF::X86MCAsmInfoGNUCOFF(const Triple &Triple) {

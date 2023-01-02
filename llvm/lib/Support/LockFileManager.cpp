@@ -21,7 +21,6 @@
 #include <ctime>
 #include <memory>
 #include <random>
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <system_error>
 #include <thread>
@@ -31,7 +30,11 @@
 #include <windows.h>
 #endif
 #if LLVM_ON_UNIX
+#include <sys/stat.h>
 #include <unistd.h>
+#endif
+#if LLVM_ON_VALI
+#include <threads.h>
 #endif
 
 #if defined(__APPLE__) && defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && (__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ > 1050)

@@ -98,12 +98,16 @@ LLVMBinaryType LLVMBinaryGetType(LLVMBinaryRef BR) {
         return LLVMBinaryTypeMachOUniversalBinary;
       case ID_COFFImportFile:
         return LLVMBinaryTypeCOFFImportFile;
+      case ID_VPEImportFile:
+        return LLVMBinaryTypeVPEImportFile;
       case ID_IR:
         return LLVMBinaryTypeIR;
       case ID_WinRes:
         return LLVMBinaryTypeWinRes;
       case ID_COFF:
         return LLVMBinaryTypeCOFF;
+      case ID_VPE:
+        return LLVMBinaryTypeVPE;
       case ID_ELF32L:
         return LLVMBinaryTypeELF32L;
       case ID_ELF32B:

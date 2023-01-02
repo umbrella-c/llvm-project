@@ -107,6 +107,10 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "SunOS")
     support/solaris/wcsnrtombs.inc
     support/solaris/xlocale.cpp
     )
+elseif(MOLLENOS)
+  list(APPEND LIBCXX_SOURCES
+    main.cpp
+    )
 elseif(ZOS)
   list(APPEND LIBCXX_SOURCES
     support/ibm/mbsnrtowcs.cpp
@@ -212,6 +216,10 @@ if (LIBCXX_ENABLE_SHARED)
   )
   cxx_add_common_build_flags(cxx_shared)
   cxx_set_common_defines(cxx_shared)
+  
+  if(MOLLENOS)
+    target_compile_definitions(cxx_shared PRIVATE -D_DLL)
+  endif()
 
   if(ZOS)
     add_custom_command(TARGET cxx_shared POST_BUILD
@@ -287,7 +295,9 @@ if (LIBCXX_ENABLE_SHARED)
   endif()
 endif()
 
-set(CMAKE_STATIC_LIBRARY_PREFIX "lib")
+if (NOT MOLLENOS)
+  set(CMAKE_STATIC_LIBRARY_PREFIX "lib")
+endif()
 
 # Build the static library.
 if (LIBCXX_ENABLE_STATIC)
@@ -304,6 +314,10 @@ if (LIBCXX_ENABLE_STATIC)
   )
   cxx_add_common_build_flags(cxx_static)
   cxx_set_common_defines(cxx_static)
+  
+  if(MOLLENOS)
+    target_compile_options(cxx_static PRIVATE -fstatic-runtime-cxx)
+  endif()
 
   if (LIBCXX_HERMETIC_STATIC_LIBRARY)
     # If the hermetic library doesn't define the operator new/delete functions

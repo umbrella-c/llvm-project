@@ -153,7 +153,8 @@ Error Builder::addModule(Module *M) {
   Mod.UncBegin = Uncommons.size();
   Mods.push_back(Mod);
 
-  if (TT.isOSBinFormatCOFF()) {
+  bool IsVPEOrCOFF = TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE();
+  if (IsVPEOrCOFF) {
     if (auto E = M->materializeMetadata())
       return E;
     if (NamedMDNode *LinkerOptions =
@@ -189,7 +190,8 @@ Expected<int> Builder::getComdatIndex(const Comdat *C, const Module *M) {
   auto P = ComdatMap.insert(std::make_pair(C, Comdats.size()));
   if (P.second) {
     std::string Name;
-    if (TT.isOSBinFormatCOFF()) {
+    bool IsVPEOrCOFF = TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE();
+    if (IsVPEOrCOFF) {
       const GlobalValue *GV = M->getNamedValue(C->getName());
       if (!GV)
         return make_error<StringError>("Could not find leader",
@@ -307,7 +309,8 @@ Error Builder::addSymbol(const ModuleSymbolTable &Msymtab,
     Sym.ComdatIndex = *ComdatIndexOrErr;
   }
 
-  if (TT.isOSBinFormatCOFF()) {
+  bool IsVPEOrCOFF = TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE();
+  if (IsVPEOrCOFF) {
     emitLinkerFlagsForGlobalCOFF(COFFLinkerOptsOS, GV, TT, Mang);
 
     if ((Flags & object::BasicSymbolRef::SF_Weak) &&

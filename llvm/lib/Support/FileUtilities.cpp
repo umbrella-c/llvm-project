@@ -367,7 +367,7 @@ Error FilePermissionsApplier::apply(
   if (std::error_code EC = sys::fs::status(FD, OStat))
     return createFileError(OutputFilename, EC);
   if (OStat.type() == sys::fs::file_type::regular_file) {
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(LLVM_ON_VALI)
     // Keep ownership if llvm-objcopy is called under root.
     if (OutputFilename == InputFilename && OStat.getUser() == 0)
       sys::fs::changeFileOwnership(FD, Status.getUser(), Status.getGroup());

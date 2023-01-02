@@ -52,6 +52,7 @@
 #include "ToolChains/WebAssembly.h"
 #include "ToolChains/XCore.h"
 #include "ToolChains/ZOS.h"
+#include "ToolChains/Vali.h"
 #include "clang/Basic/TargetID.h"
 #include "clang/Basic/Version.h"
 #include "clang/Config/config.h"
@@ -5420,7 +5421,7 @@ InputInfoList Driver::BuildJobsForActionNoCache(
 
 const char *Driver::getDefaultImageName() const {
   llvm::Triple Target(llvm::Triple::normalize(TargetTriple));
-  return Target.isOSWindows() ? "a.exe" : "a.out";
+  return Target.isOSWindows() ? "a.exe" : Target.isOSVali() ? "a.run" : "a.out";
 }
 
 /// Create output filename based on ArgValue, which could either be a
@@ -5944,6 +5945,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
     case llvm::Triple::Mesa3D:
       TC = std::make_unique<toolchains::AMDGPUToolChain>(*this, Target, Args);
       break;
+    case llvm::Triple::Vali:
+      TC = std::make_unique<toolchains::ValiToolChain>(*this, Target, Args);
+	  break;
     case llvm::Triple::Win32:
       switch (Target.getEnvironment()) {
       default:

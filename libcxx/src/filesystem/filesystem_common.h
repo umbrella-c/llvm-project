@@ -25,6 +25,10 @@
 # define WIN32_LEAN_AND_MEAN
 # define NOMINMAX
 # include <windows.h>
+#elif defined(__MOLLENOS__)
+# include <os/services/file.h>
+# include <os/services/path.h>
+# include <io.h>
 #else
 # include <dirent.h>   // for DIR & friends
 # include <fcntl.h>    /* values for fchmodat */
@@ -275,6 +279,18 @@ struct StatT {
   uint32_t st_nlink;
   uintmax_t st_size;
 };
+#elif defined(__MOLLENOS__)
+using TimeSpec = struct timespec;
+
+struct StatT {
+  unsigned st_mode;
+  TimeSpec st_atim;
+  TimeSpec st_mtim;
+  uint64_t st_dev;
+  uint64_t st_ino;
+  uint32_t st_nlink;
+  uintmax_t st_size;
+};
 
 #else
 using TimeSpec = struct timespec;
@@ -489,7 +505,7 @@ inline TimeSpec extract_mtime(StatT const& st) { return st.st_mtim; }
 inline TimeSpec extract_atime(StatT const& st) { return st.st_atim; }
 #endif
 
-#if !defined(_LIBCPP_WIN32API)
+#if !defined(_LIBCPP_WIN32API) && !defined(__MOLLENOS__)
 inline TimeVal make_timeval(TimeSpec const& ts) {
   using namespace chrono;
   auto Convert = [](long nsec) {
@@ -577,6 +593,47 @@ static pair<string_view, file_type> posix_readdir(DIR* dir_stream,
     return {};
   } else {
     return {dir_entry_ptr->d_name, get_file_type(dir_entry_ptr, 0)};
+  }
+}
+
+#elif defined(__MOLLENOS__)
+
+static file_type get_file_type(struct dirent* ent) {
+  switch (ent->d_type) {
+  case DT_BLK:
+    return file_type::block;
+  case DT_CHR:
+    return file_type::character;
+  case DT_DIR:
+    return file_type::directory;
+  case DT_FIFO:
+    return file_type::fifo;
+  case DT_LNK:
+    return file_type::symlink;
+  case DT_REG:
+    return file_type::regular;
+  case DT_SOCK:
+    return file_type::socket;
+  // Unlike in lstat, hitting "unknown" here simply means that the underlying
+  // filesystem doesn't support d_type. Report is as 'none' so we correctly
+  // set the cache to empty.
+  case DT_UNKNOWN:
+    break;
+  }
+  return file_type::none;
+}
+
+static pair<string_view, file_type> posix_readdir(DIR* dir_stream,
+                                                  error_code& ec) {
+  struct dirent* dir_entry_ptr = nullptr;
+  errno = 0; // zero errno in order to detect errors
+  ec.clear();
+  if ((dir_entry_ptr = ::readdir(dir_stream)) == nullptr) {
+    if (errno)
+      ec = capture_errno();
+    return {};
+  } else {
+    return {dir_entry_ptr->d_name, get_file_type(dir_entry_ptr)};
   }
 }
 

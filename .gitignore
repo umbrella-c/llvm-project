@@ -29,6 +29,10 @@
 # Nested build directory
 /build*
 
+# Chef build artifacts
+.kitchen/
+*.pack
+
 #==============================================================================#
 # Explicit files to ignore (only matches one).
 #==============================================================================#

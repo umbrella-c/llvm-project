@@ -47,7 +47,7 @@ _LIBUNWIND_HIDDEN int __unw_init_local(unw_cursor_t *cursor,
                        static_cast<void *>(context));
 #if defined(__i386__)
 # define REGISTER_KIND Registers_x86
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) || defined(__amd64__)
 # define REGISTER_KIND Registers_x86_64
 #elif defined(__powerpc64__)
 # define REGISTER_KIND Registers_ppc64

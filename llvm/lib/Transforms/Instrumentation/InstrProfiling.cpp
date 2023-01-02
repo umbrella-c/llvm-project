@@ -829,7 +829,8 @@ static bool needsRuntimeRegistrationOfSectionRange(const Triple &TT) {
     return false;
   // Use linker script magic to get data/cnts/name start/end.
   if (TT.isOSAIX() || TT.isOSLinux() || TT.isOSFreeBSD() || TT.isOSNetBSD() ||
-      TT.isOSSolaris() || TT.isOSFuchsia() || TT.isPS() || TT.isOSWindows())
+      TT.isOSSolaris() || TT.isOSFuchsia() || TT.isPS() || TT.isOSWindows() ||
+      TT.isOSVali())
     return false;
 
   return true;
@@ -904,6 +905,7 @@ InstrProfiling::getOrCreateRegionCounters(InstrProfInstBase *Inc) {
   // nodeduplicate COMDAT which is lowered to a zero-flag section group. This
   // allows -z start-stop-gc to discard the entire group when the function is
   // discarded.
+  bool IsVPEOrCOFF = TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE();
   bool DataReferencedByCode = profDataReferencedByCode(*M);
   bool NeedComdat = needsComdatForCounter(*Fn, *M);
   bool Renamed;
@@ -914,7 +916,7 @@ InstrProfiling::getOrCreateRegionCounters(InstrProfInstBase *Inc) {
   auto MaybeSetComdat = [&](GlobalVariable *GV) {
     bool UseComdat = (NeedComdat || TT.isOSBinFormatELF());
     if (UseComdat) {
-      StringRef GroupName = TT.isOSBinFormatCOFF() && DataReferencedByCode
+      StringRef GroupName = IsVPEOrCOFF && DataReferencedByCode
                                 ? GV->getName()
                                 : CntsVarName;
       Comdat *C = M->getOrInsertComdat(GroupName);
@@ -1035,7 +1037,7 @@ InstrProfiling::getOrCreateRegionCounters(InstrProfInstBase *Inc) {
   // If no hash suffix, other profd copies may be referenced by code.
   if (NS == 0 && !(DataReferencedByCode && NeedComdat && !Renamed) &&
       (TT.isOSBinFormatELF() ||
-       (!DataReferencedByCode && TT.isOSBinFormatCOFF()))) {
+       (!DataReferencedByCode && IsVPEOrCOFF))) {
     Linkage = GlobalValue::PrivateLinkage;
     Visibility = GlobalValue::DefaultVisibility;
   }
@@ -1248,8 +1250,9 @@ void InstrProfiling::emitUses() {
   // Similarly on COFF, if prof data is not referenced by code we use one comdat
   // and ensure this GC property as well. Otherwise, we have to conservatively
   // make all of the sections retained by the linker.
+  bool IsVPEOrCOFF = TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE();
   if (TT.isOSBinFormatELF() || TT.isOSBinFormatMachO() ||
-      (TT.isOSBinFormatCOFF() && !profDataReferencedByCode(*M)))
+      (IsVPEOrCOFF && !profDataReferencedByCode(*M)))
     appendToCompilerUsed(*M, CompilerUsedVars);
   else
     appendToUsed(*M, CompilerUsedVars);

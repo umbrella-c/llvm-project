@@ -888,7 +888,8 @@ bool FormatSpecifier::hasValidLengthModifier(const TargetInfo &Target,
         case ConversionSpecifier::xArg:
         case ConversionSpecifier::XArg:
           return !Target.getTriple().isOSDarwin() &&
-                 !Target.getTriple().isOSWindows();
+                 !Target.getTriple().isOSWindows() &&
+                 !Target.getTriple().isOSVali();
         default:
           return false;
       }

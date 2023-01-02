@@ -2407,9 +2407,10 @@ bool IRTranslator::translateCall(const User &U, MachineIRBuilder &MIRBuilder) {
   const Function *F = CI.getCalledFunction();
 
   // FIXME: support Windows dllimport function calls.
+  bool IsValiOrWindows = MF->getTarget().getTargetTriple().isOSWindows() ||
+                         MF->getTarget().getTargetTriple().isOSVali();
   if (F && (F->hasDLLImportStorageClass() ||
-            (MF->getTarget().getTargetTriple().isOSWindows() &&
-             F->hasExternalWeakLinkage())))
+            (IsValiOrWindows && F->hasExternalWeakLinkage())))
     return false;
 
   // FIXME: support control flow guard targets.
@@ -2731,7 +2732,9 @@ bool IRTranslator::translateAlloca(const User &U,
   }
 
   // FIXME: support stack probing for Windows.
-  if (MF->getTarget().getTargetTriple().isOSWindows())
+  bool IsValiOrWindows = MF->getTarget().getTargetTriple().isOSWindows() ||
+                         MF->getTarget().getTargetTriple().isOSVali();
+  if (IsValiOrWindows)
     return false;
 
   // Now we're in the harder dynamic case.

@@ -48,6 +48,8 @@ bool convertYAML(yaml::Input &YIn, raw_ostream &Out, ErrorHandler ErrHandler,
       return yaml2wasm(*Doc.Wasm, Out, ErrHandler);
     if (Doc.Xcoff)
       return yaml2xcoff(*Doc.Xcoff, Out, ErrHandler);
+    if (Doc.Vpe)
+      return yaml2vpe(*Doc.Vpe, Out, ErrHandler);
     if (Doc.DXContainer)
       return yaml2dxcontainer(*Doc.DXContainer, Out, ErrHandler);
 

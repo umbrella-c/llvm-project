@@ -8,7 +8,7 @@
 
 #include "int_lib.h"
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(MOLLENOS)
 #include <sys/mman.h>
 #endif
 
@@ -20,6 +20,9 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#elif defined(MOLLENOS)
+#include <os/mollenos.h>
+#include <os/memory.h>
 #else
 #ifndef __APPLE__
 #include <unistd.h>
@@ -46,6 +49,11 @@ COMPILER_RT_ABI void __enable_execute_stack(void *addr) {
     return; // We should probably assert here because there is no return value
   VirtualProtect(mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE,
                  &mbi.Protect);
+#elif defined(MOLLENOS)
+  unsigned int previousValue = 0;
+  (void)MemoryProtect(addr, 0x1000, 
+    MEMORY_READ | MEMORY_WRITE | MEMORY_EXECUTABLE, 
+    &previousValue);
 #else
 #if __APPLE__
   // On Darwin, pagesize is always 4096 bytes

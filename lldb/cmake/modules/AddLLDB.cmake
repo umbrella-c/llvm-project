@@ -72,7 +72,7 @@ function(add_lldb_library name)
   #PIC not needed on Win
   # FIXME: Setting CMAKE_CXX_FLAGS here is a no-op, use target_compile_options
   # or omit this logic instead.
-  if (NOT WIN32)
+  if (NOT WIN32 AND NOT MOLLENOS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
   endif()
 

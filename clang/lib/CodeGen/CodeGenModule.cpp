@@ -1145,8 +1145,8 @@ static bool shouldAssumeDSOLocal(const CodeGenModule &CGM,
     return false;
 
   const llvm::Triple &TT = CGM.getTriple();
-  if (TT.isWindowsGNUEnvironment()) {
-    // In MinGW, variables without DLLImport can still be automatically
+  if (TT.isWindowsGNUEnvironment() || TT.isOSVali()) {
+    // In MinGW and Vali, variables without DLLImport can still be automatically
     // imported from a DLL by the linker; don't mark variables that
     // potentially could come from another DLL as DSO local.
 
@@ -1162,7 +1162,8 @@ static bool shouldAssumeDSOLocal(const CodeGenModule &CGM,
   // On COFF, don't mark 'extern_weak' symbols as DSO local. If these symbols
   // remain unresolved in the link, they can be resolved to zero, which is
   // outside the current DSO.
-  if (TT.isOSBinFormatCOFF() && GV->hasExternalWeakLinkage())
+  bool IsVPEOrCOFF = TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE();
+  if (IsVPEOrCOFF && GV->hasExternalWeakLinkage())
     return false;
 
   // Every other GV is local on COFF.
@@ -1170,7 +1171,7 @@ static bool shouldAssumeDSOLocal(const CodeGenModule &CGM,
   // *-win32-macho triples. This (accidentally?) produced windows relocations
   // without GOT tables in older clang versions; Keep this behaviour.
   // FIXME: even thread local variables?
-  if (TT.isOSBinFormatCOFF() || (TT.isOSWindows() && TT.isOSBinFormatMachO()))
+  if (IsVPEOrCOFF || (TT.isOSWindows() && TT.isOSBinFormatMachO()))
     return true;
 
   // Only handle COFF and ELF for now.
@@ -4289,7 +4290,7 @@ CodeGenModule::CreateRuntimeFunction(llvm::FunctionType *FTy, StringRef Name,
       // functions imported when they are not imported can cause linker errors
       // and warnings.
       if (!Local && getTriple().isWindowsItaniumEnvironment() &&
-          !getCodeGenOpts().LTOVisibilityPublicStd) {
+          !getCodeGenOpts().LTOVisibilityPublicStd && !getLangOpts().Static) {
         const FunctionDecl *FD = GetRuntimeFunctionDecl(Context, Name);
         if (!FD || FD->hasAttr<DLLImportAttr>()) {
           F->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
@@ -5642,7 +5643,8 @@ CodeGenModule::GetAddrOfConstantCFString(const StringLiteral *Literal) {
 
     llvm::Constant *C = CreateRuntimeVariable(Ty, CFConstantStringClassName);
 
-    if (Triple.isOSBinFormatELF() || Triple.isOSBinFormatCOFF()) {
+    bool IsVPEOrCOFF = Triple.isOSBinFormatCOFF() || Triple.isOSBinFormatVPE();
+    if (Triple.isOSBinFormatELF() || IsVPEOrCOFF) {
       llvm::GlobalValue *GV = nullptr;
 
       if ((GV = dyn_cast<llvm::GlobalValue>(C))) {
@@ -5768,6 +5770,7 @@ CodeGenModule::GetAddrOfConstantCFString(const StringLiteral *Literal) {
   case llvm::Triple::SPIRV:
   case llvm::Triple::XCOFF:
     llvm_unreachable("unimplemented");
+  case llvm::Triple::VPE:
   case llvm::Triple::COFF:
   case llvm::Triple::ELF:
   case llvm::Triple::Wasm:

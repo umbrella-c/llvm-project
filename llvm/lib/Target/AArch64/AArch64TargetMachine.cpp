@@ -248,6 +248,8 @@ static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
     return std::make_unique<AArch64_MachoTargetObjectFile>();
   if (TT.isOSBinFormatCOFF())
     return std::make_unique<AArch64_COFFTargetObjectFile>();
+  if (TT.isOSBinFormatVPE())
+    return std::make_unique<AArch64_VPETargetObjectFile>();
 
   return std::make_unique<AArch64_ELFTargetObjectFile>();
 }

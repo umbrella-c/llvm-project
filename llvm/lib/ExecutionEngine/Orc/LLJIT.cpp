@@ -794,7 +794,8 @@ LLJIT::createObjectLinkingLayer(LLJITBuilderState &S, ExecutionSession &ES) {
   auto Layer =
       std::make_unique<RTDyldObjectLinkingLayer>(ES, std::move(GetMemMgr));
 
-  if (S.JTMB->getTargetTriple().isOSBinFormatCOFF()) {
+  if (S.JTMB->getTargetTriple().isOSBinFormatCOFF() ||
+      S.JTMB->getTargetTriple().isOSBinFormatVPE()) {
     Layer->setOverrideObjectFlagsWithResponsibilityFlags(true);
     Layer->setAutoClaimResponsibilityForObjectSymbols(true);
   }

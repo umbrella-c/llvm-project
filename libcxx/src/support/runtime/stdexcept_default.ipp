@@ -18,7 +18,6 @@ static_assert(sizeof(std::__libcpp_refstring) == sizeof(const char*), "");
 
 namespace std // purposefully not using versioning namespace
 {
-
 logic_error::logic_error(const string& msg) : __imp_(msg.c_str()) {}
 
 logic_error::logic_error(const char* msg) : __imp_(msg) {}

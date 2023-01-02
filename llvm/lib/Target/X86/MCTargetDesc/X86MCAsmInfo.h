@@ -16,6 +16,7 @@
 #include "llvm/MC/MCAsmInfoCOFF.h"
 #include "llvm/MC/MCAsmInfoDarwin.h"
 #include "llvm/MC/MCAsmInfoELF.h"
+#include "llvm/MC/MCAsmInfoVPE.h"
 
 namespace llvm {
 class Triple;
@@ -61,6 +62,14 @@ class X86MCAsmInfoGNUCOFF : public MCAsmInfoGNUCOFF {
 public:
   explicit X86MCAsmInfoGNUCOFF(const Triple &Triple);
 };
+
+class X86VPEMCAsmInfo : public MCAsmInfoVPE {
+  void anchor() override;
+
+public:
+  explicit X86VPEMCAsmInfo(const Triple &Triple);
+};
+
 } // namespace llvm
 
 #endif

@@ -533,6 +533,8 @@ set(files
   __support/solaris/floatingpoint.h
   __support/solaris/wchar.h
   __support/solaris/xlocale.h
+  __support/vali/limits_vali.h
+  __support/vali/locale_vali.h
   __support/win32/locale_win32.h
   __support/xlocale/__nop_locale_mgmt.h
   __support/xlocale/__posix_l_fallback.h
@@ -877,7 +879,7 @@ add_dependencies(cxx-headers generate-cxx-headers)
 target_include_directories(cxx-headers INTERFACE ${LIBCXX_GENERATED_INCLUDE_DIR}
                                                  ${LIBCXX_GENERATED_INCLUDE_TARGET_DIR})
 
-if (LIBCXX_INSTALL_HEADERS)
+if (LIBCXX_INSTALL_HEADERS)  
   foreach(file ${files})
     get_filename_component(dir ${file} DIRECTORY)
     install(FILES ${file}

@@ -2529,7 +2529,7 @@ X86FrameLowering::getFrameIndexReferencePreferSP(const MachineFunction &MF,
   // SP in the middle of the function.
 
   if (MFI.isFixedObjectIndex(FI) && TRI->hasStackRealignment(MF) &&
-      !STI.isTargetWin64())
+      !(STI.isTargetWin64() || STI.isTargetVali64()))
     return getFrameIndexReference(MF, FI, FrameReg);
 
   // If !hasReservedCallFrame the function might have SP adjustement in the
@@ -2924,8 +2924,8 @@ void X86FrameLowering::adjustForSegmentedStacks(
   if (MF.getFunction().isVarArg())
     report_fatal_error("Segmented stacks do not support vararg functions.");
   if (!STI.isTargetLinux() && !STI.isTargetDarwin() && !STI.isTargetWin32() &&
-      !STI.isTargetWin64() && !STI.isTargetFreeBSD() &&
-      !STI.isTargetDragonFly())
+      !STI.isTargetWin64() && !STI.isTargetFreeBSD() && !STI.isTargetVali32() &&
+      !STI.isTargetVali64() && !STI.isTargetDragonFly())
     report_fatal_error("Segmented stacks not supported on this platform.");
 
   // Eventually StackSize will be calculated by a link-time pass; which will
@@ -2971,7 +2971,7 @@ void X86FrameLowering::adjustForSegmentedStacks(
     } else if (STI.isTargetDarwin()) {
       TlsReg = X86::GS;
       TlsOffset = 0x60 + 90*8; // See pthread_machdep.h. Steal TLS slot 90.
-    } else if (STI.isTargetWin64()) {
+    } else if (STI.isTargetWin64() || STI.isTargetVali64()) {
       TlsReg = X86::GS;
       TlsOffset = 0x28; // pvArbitrary, reserved for application use
     } else if (STI.isTargetFreeBSD()) {
@@ -3017,7 +3017,7 @@ void X86FrameLowering::adjustForSegmentedStacks(
       BuildMI(checkMBB, DL, TII.get(X86::LEA32r), ScratchReg).addReg(X86::ESP)
         .addImm(1).addReg(0).addImm(-StackSize).addReg(0);
 
-    if (STI.isTargetLinux() || STI.isTargetWin32() || STI.isTargetWin64() ||
+    if (STI.isTargetLinux() || STI.isOSWindows() || STI.isOSVali() ||
         STI.isTargetDragonFly()) {
       BuildMI(checkMBB, DL, TII.get(X86::CMP32rm)).addReg(ScratchReg)
         .addReg(0).addImm(0).addReg(0).addImm(TlsOffset).addReg(TlsReg);
@@ -3532,7 +3532,7 @@ bool X86FrameLowering::canUseAsEpilogue(const MachineBasicBlock &MBB) const {
   // not taking a chance at messing with them.
   // I.e., unless this block is already an exit block, we can't use
   // it as an epilogue.
-  if (STI.isTargetWin64() && !MBB.succ_empty() && !MBB.isReturnBlock())
+  if ((STI.isTargetWin64() || STI.isTargetVali64()) && !MBB.succ_empty() && !MBB.isReturnBlock())
     return false;
 
   // Swift async context epilogue has a BTR instruction that clobbers parts of

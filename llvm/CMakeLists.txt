@@ -402,7 +402,7 @@ mark_as_advanced(LLVM_EXAMPLES_INSTALL_DIR)
 # They are used as destination of target generators.
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib${LLVM_LIBDIR_SUFFIX})
-if(WIN32 OR CYGWIN)
+if(WIN32 OR CYGWIN OR MOLLENOS)
   # DLL platform -- put DLLs into bin.
   set(LLVM_SHLIB_OUTPUT_INTDIR ${LLVM_RUNTIME_OUTPUT_INTDIR})
 else()
@@ -1117,10 +1117,10 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 include_directories( ${LLVM_INCLUDE_DIR} ${LLVM_MAIN_INCLUDE_DIR})
 
 # when crosscompiling import the executable targets from a file
-if(LLVM_USE_HOST_TOOLS)
+if(LLVM_USE_HOST_TOOLS AND NOT MOLLENOS)
   include(CrossCompile)
   llvm_create_cross_target(LLVM NATIVE "" Release)
-endif(LLVM_USE_HOST_TOOLS)
+endif(LLVM_USE_HOST_TOOLS AND NOT MOLLENOS)
 if(LLVM_TARGET_IS_CROSSCOMPILE_HOST)
 # Dummy use to avoid CMake Warning: Manually-specified variables were not used
 # (this is a variable that CrossCompile sets on recursive invocations)

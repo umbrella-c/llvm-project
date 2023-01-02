@@ -369,6 +369,7 @@ public:
   bool isTargetWindows() const { return TargetTriple.isOSWindows(); }
 
   bool isTargetCOFF() const { return TargetTriple.isOSBinFormatCOFF(); }
+  bool isTargetVPE() const { return TargetTriple.isOSBinFormatVPE(); }
   bool isTargetELF() const { return TargetTriple.isOSBinFormatELF(); }
   bool isTargetMachO() const { return TargetTriple.isOSBinFormatMachO(); }
 

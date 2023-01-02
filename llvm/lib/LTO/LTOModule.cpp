@@ -643,13 +643,17 @@ void LTOModule::parseMetadata() {
 
   // Globals - we only need to do this for COFF.
   const Triple TT(_target->getTargetTriple());
-  if (!TT.isOSBinFormatCOFF())
+  bool IsVPEOrCOFF = TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE();
+  if (!IsVPEOrCOFF)
     return;
   Mangler M;
   for (const NameAndAttributes &Sym : _symbols) {
     if (!Sym.symbol)
       continue;
-    emitLinkerFlagsForGlobalCOFF(OS, Sym.symbol, TT, M);
+    if (TT.isOSBinFormatCOFF())
+      emitLinkerFlagsForGlobalCOFF(OS, Sym.symbol, TT, M);
+    if (TT.isOSBinFormatVPE())
+      emitLinkerFlagsForGlobalVPE(OS, Sym.symbol, TT, M);
   }
 }
 

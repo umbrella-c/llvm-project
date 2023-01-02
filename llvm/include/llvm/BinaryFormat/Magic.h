@@ -55,6 +55,9 @@ struct file_magic {
     cuda_fatbinary,      ///< CUDA Fatbinary object file
     offload_binary,      ///< LLVM offload object file
     dxcontainer_object,  ///< DirectX container file
+    vpe_object,          ///< VPE object file
+    vpe_import_library,  ///< VPE import library
+    vpe_executable,      ///< VPE executable file
   };
 
   bool is_object() const { return V != unknown; }

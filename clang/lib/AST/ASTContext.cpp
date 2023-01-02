@@ -7556,8 +7556,8 @@ bool ASTContext::getByrefLifetime(QualType Ty,
 CanQualType ASTContext::getNSUIntegerType() const {
   assert(Target && "Expected target to be initialized");
   const llvm::Triple &T = Target->getTriple();
-  // Windows is LLP64 rather than LP64
-  if (T.isOSWindows() && T.isArch64Bit())
+  // Windows & Vali is LLP64 rather than LP64
+  if ((T.isOSWindows() || T.isOSVali()) && T.isArch64Bit())
     return UnsignedLongLongTy;
   return UnsignedLongTy;
 }
@@ -7565,8 +7565,8 @@ CanQualType ASTContext::getNSUIntegerType() const {
 CanQualType ASTContext::getNSIntegerType() const {
   assert(Target && "Expected target to be initialized");
   const llvm::Triple &T = Target->getTriple();
-  // Windows is LLP64 rather than LP64
-  if (T.isOSWindows() && T.isArch64Bit())
+  // Windows & Vali is LLP64 rather than LP64
+  if ((T.isOSWindows() || T.isOSVali()) && T.isArch64Bit())
     return LongLongTy;
   return LongTy;
 }

@@ -4002,6 +4002,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     // __c11 builtin, ptr is 0 (indicating a properly-aligned object), since
     // _Atomic(T) is always properly-aligned.
     const char *LibCallName = "__atomic_is_lock_free";
+    bool isVali = getTarget().getTriple().isOSVali();
     CallArgList Args;
     Args.add(RValue::get(EmitScalarExpr(E->getArg(0))),
              getContext().getSizeType());
@@ -4014,7 +4015,7 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     const CGFunctionInfo &FuncInfo =
         CGM.getTypes().arrangeBuiltinFunctionCall(E->getType(), Args);
     llvm::FunctionType *FTy = CGM.getTypes().GetFunctionType(FuncInfo);
-    llvm::FunctionCallee Func = CGM.CreateRuntimeFunction(FTy, LibCallName);
+    llvm::FunctionCallee Func = CGM.CreateRuntimeFunction(FTy, LibCallName, llvm::AttributeList(), isVali);
     return EmitCall(FuncInfo, CGCallee::forDirect(Func),
                     ReturnValueSlot(), Args);
   }

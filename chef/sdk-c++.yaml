@@ -1,0 +1,113 @@
+name: sdk-cpp
+version: 16.0.0
+author: Philip Meulengracht
+email: the_meulengracht@hotmail.com
+license: LGPL
+homepage: www.mollenos.com
+
+platforms:
+  - name: vali
+    toolchain: vali/clang-cc=devel
+    architectures: [amd64, i386]
+
+environment:
+  host:
+    packages:
+      - build-essential
+      - cmake
+      - python3
+  build:
+    ingredients:
+      - name: vali/sdk-c
+        channel: devel
+      - name: vali/zlib
+        channel: devel
+
+recipes:
+  - name: llvm-runtimes
+    path: runtimes
+    toolchain: platform
+    steps:
+    - name: config
+      type: generate
+      system: cmake
+      arguments:
+        - -G
+        - '"Unix Makefiles"'
+        - -DLLVM_ENABLE_RUNTIMES='compiler-rt;libunwind;libcxxabi;libcxx;'
+        - -DCMAKE_BUILD_TYPE=Release
+        - -DLLVM_INCLUDE_TESTS=OFF
+        - -DLLVM_DEFAULT_TARGET_TRIPLE=$[[ CHEF_TARGET_ARCHITECTURE ]]-uml-vali
+        - -DLLVM_ENABLE_LLD=ON
+        - -DLLVM_ENABLE_LIBCXX=ON
+        - -DLIBCXXABI_USE_LLVM_UNWINDER=ON
+        - -DLIBCXXABI_ENABLE_SHARED=OFF
+        - -DLIBCXX_CXX_ABI='libcxxabi'
+        - -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON
+        - -DCMAKE_TOOLCHAIN_FILE=$[[ PROJECT_PATH ]]/chef/vali.cmake
+      env:
+        VALICC: $[[ TOOLCHAIN_PREFIX ]]/usr/local
+        VALI_ARCH: $[[ CHEF_TARGET_ARCHITECTURE ]]
+        VALI_SDK_PATH: $[[ BUILD_INGREDIENTS_PREFIX ]]
+        LIBCXX_BOOTSTRAP: true
+    - name: build runtimes
+      type: build
+      depends: [config]
+      system: make
+      arguments: [cxx, cxxabi, unwind, compiler-rt]
+      env:
+        VALICC: $[[ TOOLCHAIN_PREFIX ]]/usr/local
+        VALI_SDK_PATH: $[[ BUILD_INGREDIENTS_PREFIX ]]
+  - name: llvm-projects
+    path: llvm
+    toolchain: platform
+    steps:
+    - name: config
+      type: generate
+      system: cmake
+      arguments:
+        - -G
+        - '"Unix Makefiles"'
+        - -DCMAKE_BUILD_TYPE=Release
+        - -DLLVM_INCLUDE_TESTS=OFF
+        - -DLLVM_INCLUDE_EXAMPLES=OFF
+        - -DLLVM_INCLUDE_BENCHMARKS=OFF
+        - -DLLVM_ENABLE_DUMP=ON
+        - -DLLVM_TARGETS_TO_BUILD='X86'
+        - -DLLVM_DEFAULT_TARGET_TRIPLE=$[[ CHEF_TARGET_ARCHITECTURE ]]-uml-vali
+        - -DLLVM_ENABLE_LLD=ON
+        - -DCMAKE_TOOLCHAIN_FILE=$[[ PROJECT_PATH ]]/chef/vali.cmake
+      env:
+        VALICC: $[[ TOOLCHAIN_PREFIX ]]/usr/local
+        VALI_ARCH: $[[ CHEF_TARGET_ARCHITECTURE ]]
+        VALI_SDK_PATH: $[[ BUILD_INGREDIENTS_PREFIX ]]
+        VALI_RUNTIME_PATH: $[[ INSTALL_PREFIX ]]
+    - name: build llvm
+      type: build
+      depends: [config]
+      system: make
+      env:
+        VALICC: $[[ TOOLCHAIN_PREFIX ]]/usr/local
+        VALI_SDK_PATH: $[[ BUILD_INGREDIENTS_PREFIX ]]
+
+packs:
+- name: sdk-cpp
+  summary: C++ SDK for Vali
+  description: |
+    The base SDK and runtime for the C++ language. It is required to build any C++ applications
+    against the MollenOS/Vali operating system.
+  type: ingredient
+  filters:
+    - bin/c++*
+    - bin/unwind*
+    - include/c++
+    - lib/c++*
+    - lib/unwind*
+- name: libllvm
+  summary: LLVM library for Vali
+  description: |
+    The LLVM library for the Vali operating system.
+  type: ingredient
+  filters:
+    - include/llvm*
+    - lib/LLVM*

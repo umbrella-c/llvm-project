@@ -1,0 +1,44 @@
+name: clang-cc
+version: 16.0.0
+author: Philip Meulengracht
+email: the_meulengracht@hotmail.com
+license: MIT
+
+environment:
+  host:
+    packages:
+      - gcc
+      - g++
+      - git
+      - build-essential
+      - cmake
+      - python3
+
+recipes:
+  - name: llvm-projects
+    source:
+      type: path
+      path: /
+    steps:
+    - name: config
+      type: generate
+      system: cmake
+      source-dir: llvm
+      arguments:
+        - -G
+        - '"Unix Makefiles"'
+        - -DLLVM_ENABLE_PROJECTS='clang;clang-tools-extra;lldb;lld'
+        - -DCMAKE_BUILD_TYPE=Release
+        - -DLLVM_INCLUDE_TESTS=Off
+    - name: build
+      type: build
+      depends: [config]
+      system: make
+
+packs:
+  - name: clang-cc
+    summary: Clang/llvm crosscompiler for Vali/MollenOS
+    description: |
+      The toolchain to use when cross compiling for vali/mollenos. It includes support
+      for VPE binary formats, and neccessary changes required.
+    type: toolchain

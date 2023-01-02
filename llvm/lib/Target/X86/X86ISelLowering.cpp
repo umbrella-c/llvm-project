@@ -138,7 +138,7 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
   }
 
   // Setup Windows compiler runtime calls.
-  if (Subtarget.isTargetWindowsMSVC() || Subtarget.isTargetWindowsItanium()) {
+  if (Subtarget.isTargetWindowsMSVC() || Subtarget.isTargetWindowsItanium() || Subtarget.isOSVali()) {
     static const struct {
       const RTLIB::Libcall Op;
       const char * const Name;
@@ -522,8 +522,8 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
 
   // FIXME - use subtarget debug flags
   if (!Subtarget.isTargetDarwin() && !Subtarget.isTargetELF() &&
-      !Subtarget.isTargetCygMing() && !Subtarget.isTargetWin64() &&
-      TM.Options.ExceptionModel != ExceptionHandling::SjLj) {
+      !Subtarget.isTargetCygMing() && !Subtarget.isTargetWin64() && 
+      !Subtarget.isTargetVali64() && TM.Options.ExceptionModel != ExceptionHandling::SjLj) {
     setOperationAction(ISD::EH_LABEL, MVT::Other, Expand);
   }
 
@@ -2319,7 +2319,7 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
     setOperationAction(ISD::FSINCOS, MVT::f32, Custom);
   }
 
-  if (Subtarget.isTargetWin64()) {
+  if (Subtarget.isTargetWin64() || Subtarget.isTargetVali64()) {
     setOperationAction(ISD::SDIV, MVT::i128, Custom);
     setOperationAction(ISD::UDIV, MVT::i128, Custom);
     setOperationAction(ISD::SREM, MVT::i128, Custom);
@@ -2339,7 +2339,7 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
   // This is what the CRT headers do - `fmodf` is an inline header
   // function casting to f64 and calling `fmod`.
   if (Subtarget.is32Bit() &&
-      (Subtarget.isTargetWindowsMSVC() || Subtarget.isTargetWindowsItanium()))
+      (Subtarget.isTargetWindowsMSVC() || Subtarget.isTargetWindowsItanium() || Subtarget.isOSVali()))
     for (ISD::NodeType Op :
          {ISD::FCEIL,  ISD::STRICT_FCEIL,
           ISD::FCOS,   ISD::STRICT_FCOS,
@@ -20895,7 +20895,7 @@ X86TargetLowering::LowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const {
     return DAG.getCopyFromReg(Chain, DL, Reg, PtrVT, Chain.getValue(1));
   }
 
-  if (Subtarget.isOSWindows()) {
+  if (Subtarget.isOSWindows() || Subtarget.isOSVali()) {
     // Just use the implicit TLS architecture
     // Need to generate something similar to:
     //   mov     rdx, qword [gs:abs 58H]; Load pointer to ThreadLocalStorage
@@ -26294,7 +26294,8 @@ X86TargetLowering::LowerDYNAMIC_STACKALLOC(SDValue Op,
   MachineFunction &MF = DAG.getMachineFunction();
   bool SplitStack = MF.shouldSplitStack();
   bool EmitStackProbeCall = hasStackProbeSymbol(MF);
-  bool Lower = (Subtarget.isOSWindows() && !Subtarget.isTargetMachO()) ||
+  bool IsValiOrWindows = Subtarget.isOSWindows() || Subtarget.isOSVali();
+  bool Lower = (IsValiOrWindows && !Subtarget.isTargetMachO()) ||
                SplitStack || EmitStackProbeCall;
   SDLoc dl(Op);
 
@@ -28750,7 +28751,7 @@ Register X86TargetLowering::getExceptionSelectorRegister(
 }
 
 bool X86TargetLowering::needsFixedCatchObjects() const {
-  return Subtarget.isTargetWin64();
+  return Subtarget.isTargetWin64() || Subtarget.isTargetVali64();
 }
 
 SDValue X86TargetLowering::LowerEH_RETURN(SDValue Op, SelectionDAG &DAG) const {
@@ -29953,7 +29954,7 @@ static SDValue LowerMULO(SDValue Op, const X86Subtarget &Subtarget,
 }
 
 SDValue X86TargetLowering::LowerWin64_i128OP(SDValue Op, SelectionDAG &DAG) const {
-  assert(Subtarget.isTargetWin64() && "Unexpected target");
+  assert((Subtarget.isTargetWin64() || Subtarget.isTargetVali64()) && "Unexpected target");
   EVT VT = Op.getValueType();
   assert(VT.isInteger() && VT.getSizeInBits() == 128 &&
          "Unexpected return type for lowering");
@@ -57447,7 +57448,8 @@ bool X86TargetLowering::hasStackProbeSymbol(const MachineFunction &MF) const {
 bool X86TargetLowering::hasInlineStackProbe(const MachineFunction &MF) const {
 
   // No inline stack probe for Windows, they have their own mechanism.
-  if (Subtarget.isOSWindows() ||
+  bool IsValiOrWindows = Subtarget.isOSWindows() || Subtarget.isOSVali();
+  if (IsValiOrWindows ||
       MF.getFunction().hasFnAttribute("no-stack-arg-probe"))
     return false;
 
@@ -57473,7 +57475,8 @@ X86TargetLowering::getStackProbeSymbolName(const MachineFunction &MF) const {
 
   // Generally, if we aren't on Windows, the platform ABI does not include
   // support for stack probes, so don't emit them.
-  if (!Subtarget.isOSWindows() || Subtarget.isTargetMachO() ||
+  bool IsValiOrWindows = Subtarget.isOSWindows() || Subtarget.isOSVali();
+  if (!IsValiOrWindows || Subtarget.isTargetMachO() ||
       MF.getFunction().hasFnAttribute("no-stack-arg-probe"))
     return "";
 

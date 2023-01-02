@@ -17,6 +17,9 @@
 #ifdef LLVM_ON_UNIX
 #include "Unix/Watchdog.inc"
 #endif
+#ifdef LLVM_ON_VALI
+#include "Vali/Watchdog.inc"
+#endif
 #ifdef _WIN32
 #include "Windows/Watchdog.inc"
 #endif

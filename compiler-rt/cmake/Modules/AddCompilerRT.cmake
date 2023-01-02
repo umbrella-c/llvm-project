@@ -129,7 +129,7 @@ function(add_asm_sources output)
   # MinGW didn't work correctly with assembly prior to CMake 3.17. https://gitlab.kitware.com/cmake/cmake/-/merge_requests/4287 and https://reviews.llvm.org/rGb780df052dd2b246a760d00e00f7de9ebdab9d09
   # Workaround these two issues by compiling as C.
   # Same workaround used in libunwind. Also update there if changed here.
-  if((APPLE AND CMAKE_VERSION VERSION_LESS 3.19) OR (MINGW AND CMAKE_VERSION VERSION_LESS 3.17))
+  if((APPLE AND CMAKE_VERSION VERSION_LESS 3.19) OR ((MINGW OR MOLLENOS) AND CMAKE_VERSION VERSION_LESS 3.17))
     set_source_files_properties(${ARGN} PROPERTIES LANGUAGE C)
   endif()
 endfunction()
@@ -395,7 +395,7 @@ function(add_compiler_rt_runtime name type)
       if(COMMAND llvm_setup_rpath)
         llvm_setup_rpath(${libname})
       endif()
-      if(WIN32 AND NOT CYGWIN AND NOT MINGW)
+      if((WIN32 OR VALI) AND NOT CYGWIN AND NOT MINGW)
         set_target_properties(${libname} PROPERTIES IMPORT_PREFIX "")
         set_target_properties(${libname} PROPERTIES IMPORT_SUFFIX ".lib")
       endif()

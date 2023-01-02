@@ -72,7 +72,7 @@ bool X86AsmPrinter::runOnMachineFunction(MachineFunction &MF) {
 
   SetupMachineFunction(MF);
 
-  if (Subtarget->isTargetCOFF()) {
+  if (Subtarget->isTargetCOFF() || Subtarget->isTargetVPE()) {
     bool Local = MF.getFunction().hasLocalLinkage();
     OutStreamer->beginCOFFSymbolDef(CurrentFnSym);
     OutStreamer->emitCOFFSymbolStorageClass(
@@ -216,8 +216,9 @@ void X86AsmPrinter::PrintSymbolOperand(const MachineOperand &MO,
       GVSym = getSymbolPreferLocal(*GV);
 
     // Handle dllimport linkage.
-    if (MO.getTargetFlags() == X86II::MO_DLLIMPORT)
+    if (MO.getTargetFlags() == X86II::MO_DLLIMPORT) {
       GVSym = OutContext.getOrCreateSymbol(Twine("__imp_") + GVSym->getName());
+    }
     else if (MO.getTargetFlags() == X86II::MO_COFFSTUB)
       GVSym =
           OutContext.getOrCreateSymbol(Twine(".refptr.") + GVSym->getName());
@@ -791,7 +792,7 @@ void X86AsmPrinter::emitStartOfAsmFile(Module &M) {
   if (TT.isOSBinFormatMachO())
     OutStreamer->switchSection(getObjFileLowering().getTextSection());
 
-  if (TT.isOSBinFormatCOFF()) {
+  if (TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE()) {
     // Emit an absolute @feat.00 symbol.
     MCSymbol *S = MMI->getContext().getOrCreateSymbol(StringRef("@feat.00"));
     OutStreamer->beginCOFFSymbolDef(S);
@@ -900,7 +901,7 @@ void X86AsmPrinter::emitEndOfAsmFile(Module &M) {
     // stripping. Since LLVM never generates code that does this, it is always
     // safe to set.
     OutStreamer->emitAssemblerFlag(MCAF_SubsectionsViaSymbols);
-  } else if (TT.isOSBinFormatCOFF()) {
+  } else if (TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE()) {
     if (MMI->usesMSVCFloatingPoint()) {
       // In Windows' libcmt.lib, there is a file which is linked in only if the
       // symbol _fltused is referenced. Linking this in causes some

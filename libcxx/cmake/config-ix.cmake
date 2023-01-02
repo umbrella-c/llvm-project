@@ -23,7 +23,7 @@ else()
 endif()
 
 if (NOT LIBCXX_USE_COMPILER_RT)
-  if(WIN32 AND NOT MINGW)
+  if((WIN32 OR VALI) AND NOT MINGW)
     set(LIBCXX_HAS_GCC_S_LIB NO)
   else()
     if(ANDROID)

@@ -1,0 +1,40 @@
+name: Chef Package
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build clang-cc Chef package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out llvm-project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 250
+
+      - name: Build and install chef
+        id: chef
+        uses: Meulengracht/bake/.github/actions/build-install@main
+        with:
+          build-type: Release
+          install-prefix: ${{ runner.temp }}/chef-install
+
+      - name: Bake clang-cc package
+        working-directory: ${{ github.workspace }}
+        run: |
+          export PATH="${{ steps.chef.outputs.install-prefix }}/bin:${PATH}"
+          bake build chef/clang-cc.yaml || true
+          sudo journalctl -u chef-cvd
+
+      - name: Upload Chef package
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-cc-chef-package
+          path: ${{ github.workspace }}/*.pack

@@ -6098,7 +6098,10 @@ static void ReferenceDllExportedMembers(Sema &S, CXXRecordDecl *Class) {
     }
   } MarkingDllexportedContext(S, Class, ClassAttr->getLocation());
 
-  if (S.Context.getTargetInfo().getTriple().isWindowsGNUEnvironment())
+  bool isMinGWOrVali = 
+    S.Context.getTargetInfo().getTriple().isWindowsGNUEnvironment() ||
+    S.Context.getTargetInfo().getTriple().isOSVali();
+  if (isMinGWOrVali)
     S.MarkVTableUsed(Class->getLocation(), Class, true);
 
   for (Decl *Member : Class->decls()) {

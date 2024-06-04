@@ -1,11 +1,12 @@
-project: 
+project:
+  name: clang-cc
+  version: 16.0.0
   summary: Clang/llvm crosscompiler for Vali/MollenOS
   description: |
     The toolchain to use when cross compiling for vali/mollenos. It includes support
     for VPE binary formats, and neccessary changes required.
   author: Philip Meulengracht
   email: the_meulengracht@hotmail.com
-  version: 16.0.0
   license: MIT
 
 environment:

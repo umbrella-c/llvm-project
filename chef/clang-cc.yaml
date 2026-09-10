@@ -20,20 +20,17 @@ recipes:
       type: path
       path: /
     steps:
-    - name: config
-      type: generate
-      system: cmake
-      source-dir: llvm
-      arguments:
-        - -G
-        - '"Unix Makefiles"'
-        - -DLLVM_ENABLE_PROJECTS='clang;clang-tools-extra;lldb;lld'
-        - -DCMAKE_BUILD_TYPE=Release
-        - -DLLVM_INCLUDE_TESTS=Off
     - name: build
       type: build
-      depends: [config]
-      system: make
+      source-dir: llvm
+      system: cmake
+      configure:
+        arguments:
+          - -G
+          - '"Unix Makefiles"'
+          - -DLLVM_ENABLE_PROJECTS='clang;clang-tools-extra;lldb;lld'
+          - -DCMAKE_BUILD_TYPE=Release
+          - -DLLVM_INCLUDE_TESTS=Off
 
 packs:
   - name: clang-cc

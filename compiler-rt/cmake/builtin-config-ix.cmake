@@ -2,6 +2,12 @@ include(BuiltinTests)
 include(CheckIncludeFiles)
 include(CheckCSourceCompiles)
 
+# A cross build can retain the host's CMAKE_SYSTEM_NAME. Select the Vali
+# builtins from the target triple rather than requiring a separate cache flag.
+if(COMPILER_RT_DEFAULT_TARGET_TRIPLE MATCHES "^[^-]+-[^-]+-vali($|[-.0-9])")
+  set(VALI TRUE)
+endif()
+
 # Make all the tests only check the compiler
 set(TEST_COMPILE_ONLY On)
 
@@ -297,7 +303,8 @@ else()
   endforeach()
 endif()
 
-if(OS_NAME MATCHES "Linux|SerenityOS" AND NOT LLVM_USE_SANITIZER AND NOT
+# Vali owns startup and unwind registration in libcrt; these CRT objects use ELF.
+if(NOT VALI AND OS_NAME MATCHES "Linux|SerenityOS" AND NOT LLVM_USE_SANITIZER AND NOT
    COMPILER_RT_GPU_BUILD)
   set(COMPILER_RT_HAS_CRT TRUE)
 else()

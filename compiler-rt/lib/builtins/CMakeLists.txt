@@ -274,7 +274,8 @@ option(COMPILER_RT_EXCLUDE_LIBC_PROVIDED_ARM_AEABI_BUILTINS
   "Skip the standard C library provided arm aeabi builtins from compiler-rt)"
   Off)
 
-if(NOT FUCHSIA AND NOT COMPILER_RT_BAREMETAL_BUILD AND NOT COMPILER_RT_GPU_BUILD)
+# Vali hosted helpers require its SDK; do not compile host libc adapters here.
+if(NOT FUCHSIA AND NOT VALI AND NOT COMPILER_RT_BAREMETAL_BUILD AND NOT COMPILER_RT_GPU_BUILD)
   set(GENERIC_SOURCES
     ${GENERIC_SOURCES}
     emutls.c
@@ -1044,6 +1045,12 @@ else ()
     if(NOT COMPILER_RT_DEBUG)
       append_list_if(COMPILER_RT_HAS_OMIT_FRAME_POINTER_FLAG -fomit-frame-pointer BUILTIN_CFLAGS)
     endif()
+  endif()
+
+  # Vali uses LLP64 on x64. Host stdint.h would silently give these builtins
+  # the wrong integer widths; use the compiler's freestanding definitions.
+  if(VALI)
+    append_list_if(COMPILER_RT_HAS_FFREESTANDING_FLAG -ffreestanding BUILTIN_CFLAGS)
   endif()
 
   # Directly targeting the GPU requires a few extra flags.

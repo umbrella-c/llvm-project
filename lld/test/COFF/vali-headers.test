@@ -1,0 +1,53 @@
+# RUN: yaml2obj %s -DMACHINE=AMD64 -DPREFIX= -o %t.64.obj
+# RUN: lld-link /lldvpe /out:%t.exe %t.64.obj
+# RUN: %python %S/Inputs/vali-verify-image.py headers %t.exe 0x8664 0x1000 exe
+# RUN: lld-link /lldvpe /dll /out:%t.dll %t.64.obj
+# RUN: %python %S/Inputs/vali-verify-image.py headers %t.dll 0x8664 0x1001 dll
+# RUN: lld-link /lldvpe /entry:explicit /out:%t.exe %t.64.obj
+# RUN: %python %S/Inputs/vali-verify-image.py headers %t.exe 0x8664 0x1002 exe
+# RUN: lld-link /lldvpe /dll /noentry /out:%t.dll %t.64.obj
+# RUN: %python %S/Inputs/vali-verify-image.py headers %t.dll 0x8664 0 dll
+
+## i386 must infer the decorated CRT names and link without SafeSEH metadata.
+# RUN: yaml2obj %s -DMACHINE=I386 -DPREFIX=_ -o %t.32.obj
+# RUN: lld-link /lldvpe /out:%t.exe %t.32.obj
+# RUN: %python %S/Inputs/vali-verify-image.py headers %t.exe 0x14c 0x1000 exe
+# RUN: lld-link /lldvpe /dll /out:%t.dll %t.32.obj
+# RUN: %python %S/Inputs/vali-verify-image.py headers %t.dll 0x14c 0x1001 dll
+
+## Exercise the linker machine paths independently of incomplete VPE MC backends.
+## These bytes are header fixtures, not executable ARM instructions.
+# RUN: yaml2obj %s -DMACHINE=ARMNT -DPREFIX= -o %t.arm.obj
+# RUN: lld-link /lldvpe /out:%t.exe %t.arm.obj
+# RUN: %python %S/Inputs/vali-verify-image.py headers %t.exe 0x1c4 0x1001 exe
+# RUN: yaml2obj %s -DMACHINE=ARM64 -DPREFIX= -o %t.arm64.obj
+# RUN: lld-link /lldvpe /out:%t.exe %t.arm64.obj
+# RUN: %python %S/Inputs/vali-verify-image.py headers %t.exe 0xaa64 0x1000 exe
+
+--- !COFF
+header:
+  Machine: IMAGE_FILE_MACHINE_[[MACHINE]]
+sections:
+  - Name: .text
+    Characteristics: [ IMAGE_SCN_CNT_CODE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_READ ]
+    Alignment: 4
+    SectionData: C3C3C300
+symbols:
+  - Name: '[[PREFIX]]__CrtConsoleEntry'
+    Value: 0
+    SectionNumber: 1
+    SimpleType: IMAGE_SYM_TYPE_NULL
+    ComplexType: IMAGE_SYM_DTYPE_FUNCTION
+    StorageClass: IMAGE_SYM_CLASS_EXTERNAL
+  - Name: '[[PREFIX]]__CrtLibraryEntry'
+    Value: 1
+    SectionNumber: 1
+    SimpleType: IMAGE_SYM_TYPE_NULL
+    ComplexType: IMAGE_SYM_DTYPE_FUNCTION
+    StorageClass: IMAGE_SYM_CLASS_EXTERNAL
+  - Name: '[[PREFIX]]explicit'
+    Value: 2
+    SectionNumber: 1
+    SimpleType: IMAGE_SYM_TYPE_NULL
+    ComplexType: IMAGE_SYM_DTYPE_FUNCTION
+    StorageClass: IMAGE_SYM_CLASS_EXTERNAL

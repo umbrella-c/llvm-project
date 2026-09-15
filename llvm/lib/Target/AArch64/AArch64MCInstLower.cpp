@@ -39,7 +39,8 @@ AArch64MCInstLower::GetGlobalAddressSymbol(const MachineOperand &MO) const {
   const GlobalValue *GV = MO.getGlobal();
   unsigned TargetFlags = MO.getTargetFlags();
   const Triple &TheTriple = Printer.TM.getTargetTriple();
-  if (!TheTriple.isOSBinFormatCOFF())
+  bool IsVPEOrCOFF = TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE();
+  if (!IsVPEOrCOFF)
     return Printer.getSymbolPreferLocal(*GV);
 
   assert(TheTriple.isOSWindows() &&

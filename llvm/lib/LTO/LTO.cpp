@@ -549,7 +549,8 @@ void LTO::addModuleToGlobalRes(ArrayRef<InputFile::Symbol> Syms,
     // Strip the __imp_ prefix from COFF dllimport symbols (similar to the
     // way they are handled by lld), otherwise we can end up with two
     // global resolutions (one with and one for a copy of the symbol without).
-    if (TT.isOSBinFormatCOFF() && Name.startswith("__imp_"))
+    bool IsVPEOrCOFF = TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE();
+    if (IsVPEOrCOFF && Name.startswith("__imp_"))
       Name = Name.substr(strlen("__imp_"));
     auto &GlobalRes = GlobalResolutions[Name];
     GlobalRes.UnnamedAddr &= Sym.isUnnamedAddr();
@@ -1696,3 +1697,9 @@ std::vector<int> lto::generateModulesOrdering(ArrayRef<BitcodeModule *> R) {
   });
   return ModulesOrdering;
 }
+
+#ifdef LLVM_ON_VALI
+extern "C" void dllmain(int action) {
+  (void)action;
+}
+#endif

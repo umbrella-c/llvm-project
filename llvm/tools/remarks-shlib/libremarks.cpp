@@ -15,3 +15,9 @@
 extern uint32_t LLVMRemarkVersion(void) {
   return REMARKS_API_VERSION;
 }
+
+#ifdef LLVM_ON_VALI
+void dllmain(int action) {
+    (void)action;
+}
+#endif

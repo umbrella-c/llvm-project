@@ -165,7 +165,7 @@
 #define NO_EXEC_STACK_DIRECTIVE
 #endif
 
-#elif defined(_WIN32)
+#elif defined(_WIN32) || defined(MOLLENOS)
 
 #define SYMBOL_IS_FUNC(name)                                                   \
   .def name SEPARATOR                                                          \
@@ -256,6 +256,15 @@ aliasname:                                                                     \
   // clang-format on
 #else
 #define DEFINE_LIBUNWIND_FUNCTION(name)                                        \
+  .globl SYMBOL_NAME(name) SEPARATOR                                           \
+  EXPORT_SYMBOL(SYMBOL_NAME(name)) SEPARATOR                                   \
+  SYMBOL_IS_FUNC(SYMBOL_NAME(name)) SEPARATOR                                  \
+  PPC64_OPD1                                                                   \
+  SYMBOL_NAME(name):                                                           \
+  PPC64_OPD2                                                                   \
+  AARCH64_BTI
+
+#define DEFINE_LIBUNWIND_PRIVATE_FUNCTION(name)                                        \
   .globl SYMBOL_NAME(name) SEPARATOR                                           \
   HIDDEN_SYMBOL(SYMBOL_NAME(name)) SEPARATOR                                   \
   SYMBOL_IS_FUNC(SYMBOL_NAME(name)) SEPARATOR                                  \

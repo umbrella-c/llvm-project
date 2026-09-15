@@ -72,7 +72,7 @@
 #include <cerrno>
 #include <optional>
 
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(__VALI__)
 #include <unistd.h>
 #else
 #include <io.h>

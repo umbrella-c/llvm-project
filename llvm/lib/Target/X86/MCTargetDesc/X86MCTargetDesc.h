@@ -13,6 +13,7 @@
 #ifndef LLVM_LIB_TARGET_X86_MCTARGETDESC_X86MCTARGETDESC_H
 #define LLVM_LIB_TARGET_X86_MCTARGETDESC_X86MCTARGETDESC_H
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -124,6 +125,14 @@ MCStreamer *createX86WinCOFFStreamer(MCContext &C,
                                      bool RelaxAll,
                                      bool IncrementalLinkerCompatible);
 
+/// Construct an X86 VPE machine code streamer which will generate
+/// PE/COFF format object files.
+MCStreamer *createX86VPEStreamer(const Triple &T, MCContext &C,
+                                 std::unique_ptr<MCAsmBackend> &&AB,
+                                 std::unique_ptr<MCObjectWriter> &&OW,
+                                 std::unique_ptr<MCCodeEmitter> &&CE,
+                                 bool RelaxAll);
+
 /// Construct an X86 Mach-O object writer.
 std::unique_ptr<MCObjectTargetWriter>
 createX86MachObjectWriter(bool Is64Bit, uint32_t CPUType, uint32_t CPUSubtype);
@@ -134,6 +143,9 @@ createX86ELFObjectWriter(bool IsELF64, uint8_t OSABI, uint16_t EMachine);
 /// Construct an X86 Win COFF object writer.
 std::unique_ptr<MCObjectTargetWriter>
 createX86WinCOFFObjectWriter(bool Is64Bit);
+/// Construct an X86 VPE object writer.
+std::unique_ptr<MCObjectTargetWriter>
+createX86VPEObjectWriter(bool Is64Bit);
 
 /// Returns the sub or super register of a specific X86 register.
 /// e.g. getX86SubSuperRegister(X86::EAX, 16) returns X86::AX.

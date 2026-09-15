@@ -36,7 +36,11 @@ if(USE_LLVM_DYLIB)
 endif()
 
 if (LLVM_COMPILER_IS_GCC_COMPATIBLE)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Wstrict-prototypes")
+  if (MOLLENOS)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11")
+  else()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -Wstrict-prototypes")
+  endif()
 endif ()
 
 add_llvm_tool(llvm-c-test

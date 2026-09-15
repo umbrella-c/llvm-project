@@ -41,7 +41,7 @@ endfunction(check_working_cxx_atomics64)
 
 
 # Check for (non-64-bit) atomic operations.
-if(MSVC)
+if(MSVC OR MOLLENOS)
   set(HAVE_CXX_ATOMICS_WITHOUT_LIB True)
 elseif(LLVM_COMPILER_IS_GCC_COMPATIBLE OR CMAKE_CXX_COMPILER_ID MATCHES "XL")
   # First check if atomics work without the library.
@@ -76,7 +76,7 @@ elseif(LLVM_COMPILER_IS_GCC_COMPATIBLE OR CMAKE_CXX_COMPILER_ID MATCHES "XL")
       if (NOT HAVE_CXX_ATOMICS64_WITH_LIB)
         message(FATAL_ERROR "Host compiler must support 64-bit std::atomic!")
       endif()
-    else()
+    elseif(NOT MOLLENOS)
       message(FATAL_ERROR "Host compiler appears to require libatomic for 64-bit operations, but cannot find it.")
     endif()
   endif()

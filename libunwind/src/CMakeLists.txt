@@ -22,6 +22,10 @@ set(LIBUNWIND_C_SOURCES
     UnwindLevel1-gcc-ext.c
     Unwind-sjlj.c
     )
+if(MOLLENOS)
+  list(APPEND LIBUNWIND_C_SOURCES main.c)
+endif()
+
 set_source_files_properties(${LIBUNWIND_C_SOURCES}
                             PROPERTIES
                               COMPILE_FLAGS "-std=c99")
@@ -36,7 +40,7 @@ set(LIBUNWIND_ASM_SOURCES
 # as C files as well.
 if((APPLE AND CMAKE_VERSION VERSION_LESS 3.19) OR
    (MINGW AND CMAKE_VERSION VERSION_LESS 3.17) OR
-   (${CMAKE_SYSTEM_NAME} MATCHES "AIX"))
+   (${CMAKE_SYSTEM_NAME} MATCHES "AIX") OR MOLLENOS)
   set_source_files_properties(${LIBUNWIND_ASM_SOURCES} PROPERTIES LANGUAGE C)
 endif()
 

@@ -273,6 +273,7 @@ struct Configuration {
   bool highEntropyVA = false;
   bool appContainer = false;
   bool mingw = false;
+  bool vpe = false;
   bool warnMissingOrderSymbol = true;
   bool warnLocallyDefinedImported = true;
   bool warnDebugInfoUnusable = true;

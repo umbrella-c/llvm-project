@@ -25,6 +25,7 @@ using namespace llvm;
 void MachineModuleInfoMachO::anchor() {}
 void MachineModuleInfoELF::anchor() {}
 void MachineModuleInfoCOFF::anchor() {}
+void MachineModuleInfoVPE::anchor() {}
 void MachineModuleInfoWasm::anchor() {}
 
 using PairTy = std::pair<MCSymbol *, MachineModuleInfoImpl::StubValueTy>;

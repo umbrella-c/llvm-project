@@ -116,6 +116,13 @@ static system_clock::time_point __libcpp_system_clock_now() {
   return system_clock::time_point(duration_cast<system_clock::duration>(d - nt_to_unix_epoch));
 }
 
+#elif defined(__MOLLENOS__)
+static system_clock::time_point __libcpp_system_clock_now() {
+    struct timespec tp;
+    timespec_get(&tp, TIME_UTC);
+    return system_clock::time_point(seconds(tp.tv_sec) + microseconds(tp.tv_nsec / 1000));
+}
+
 #elif defined(CLOCK_REALTIME) && defined(_LIBCPP_USE_CLOCK_GETTIME)
 
 static system_clock::time_point __libcpp_system_clock_now() {
@@ -279,6 +286,14 @@ static steady_clock::time_point __libcpp_steady_clock_now() noexcept {
 #    pragma comment(lib, "zircon")
 
   return steady_clock::time_point(nanoseconds(_zx_clock_get_monotonic()));
+}
+
+#  elif defined(MOLLENOS)
+
+static steady_clock::time_point __libcpp_steady_clock_now() {
+    struct timespec tp;
+    timespec_get(&tp, TIME_MONOTONIC);
+    return steady_clock::time_point(seconds(tp.tv_sec) + nanoseconds(tp.tv_nsec));
 }
 
 #  elif defined(CLOCK_MONOTONIC)

@@ -294,7 +294,8 @@ ExecutionEngine::create(Operation *m, const ExecutionEngineOptions &options) {
     // exported symbol visibility.
     // cf llvm/lib/ExecutionEngine/Orc/LLJIT.cpp LLJIT::createObjectLinkingLayer
     llvm::Triple targetTriple(llvm::Twine(llvmModule->getTargetTriple()));
-    if (targetTriple.isOSBinFormatCOFF()) {
+    bool IsVPEOrCOFF = targetTriple.isOSBinFormatCOFF() || targetTriple.isOSBinFormatVPE();
+    if (IsVPEOrCOFF) {
       objectLayer->setOverrideObjectFlagsWithResponsibilityFlags(true);
       objectLayer->setAutoClaimResponsibilityForObjectSymbols(true);
     }

@@ -333,6 +333,14 @@ if (NOT MSVC)
       x86_64/chkstk2.S
     )
   endif()
+  
+  if (VALI)
+    set(x86_64_SOURCES
+      ${x86_64_SOURCES}
+      x86_64/chkstk.S
+      x86_64/chkstk3.S
+    )
+  endif()
 
   set(i386_SOURCES
     ${GENERIC_SOURCES}
@@ -360,7 +368,7 @@ if (NOT MSVC)
     )
   endif()
 
-  if (WIN32)
+  if (WIN32 OR VALI)
     set(i386_SOURCES
       ${i386_SOURCES}
       i386/chkstk.S

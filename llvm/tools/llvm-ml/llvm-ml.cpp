@@ -420,7 +420,7 @@ int main(int Argc, char **Argv) {
     llvm_unreachable("Invalid file type!");
   }
 
-  if (TheTriple.isOSBinFormatCOFF()) {
+  if (TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE()) {
     // Emit an absolute @feat.00 symbol. This is a features bitfield read by
     // link.exe.
     int64_t Feat00Flags = 0x2;

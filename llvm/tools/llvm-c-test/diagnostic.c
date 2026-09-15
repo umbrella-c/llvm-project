@@ -18,6 +18,7 @@
 #include "llvm-c/Core.h"
 
 #include <stdio.h>
+#include <stddef.h>
 
 static void diagnosticHandler(LLVMDiagnosticInfoRef DI, void *C) {
   fprintf(stderr, "Executing diagnostic handler\n");

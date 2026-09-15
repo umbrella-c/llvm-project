@@ -285,6 +285,7 @@ public:
 
   bool isTargetELF() const { return TargetTriple.isOSBinFormatELF(); }
   bool isTargetCOFF() const { return TargetTriple.isOSBinFormatCOFF(); }
+  bool isTargetVPE() const { return TargetTriple.isOSBinFormatVPE(); }
   bool isTargetMachO() const { return TargetTriple.isOSBinFormatMachO(); }
 
   bool isTargetLinux() const { return TargetTriple.isOSLinux(); }
@@ -325,6 +326,12 @@ public:
 
   bool isTargetWin32() const { return !Is64Bit && isOSWindows(); }
 
+  bool isOSVali() const { return TargetTriple.isOSVali(); }
+
+  bool isTargetVali32() const { return !Is64Bit && isOSVali(); }
+
+  bool isTargetVali64() const { return Is64Bit && isOSVali(); }
+
   bool isPICStyleGOT() const { return PICStyle == PICStyles::Style::GOT; }
   bool isPICStyleRIPRel() const { return PICStyle == PICStyles::Style::RIPRel; }
 
@@ -347,7 +354,7 @@ public:
     case CallingConv::X86_ThisCall:
     case CallingConv::X86_VectorCall:
     case CallingConv::Intel_OCL_BI:
-      return isTargetWin64();
+      return isTargetWin64() || isTargetVali64();
     // This convention allows using the Win64 convention on other targets.
     case CallingConv::Win64:
       return true;

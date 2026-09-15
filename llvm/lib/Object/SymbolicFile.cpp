@@ -14,6 +14,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/BinaryFormat/Magic.h"
 #include "llvm/Object/COFFImportFile.h"
+#include "llvm/Object/VPEImportFile.h"
 #include "llvm/Object/Error.h"
 #include "llvm/Object/IRObjectFile.h"
 #include "llvm/Object/ObjectFile.h"
@@ -67,12 +68,16 @@ SymbolicFile::createSymbolicFile(MemoryBufferRef Object, file_magic Type,
   case file_magic::pecoff_executable:
   case file_magic::xcoff_object_32:
   case file_magic::xcoff_object_64:
+  case file_magic::vpe_executable:
   case file_magic::wasm_object:
     return ObjectFile::createObjectFile(Object, Type, InitContent);
   case file_magic::coff_import_library:
     return std::unique_ptr<SymbolicFile>(new COFFImportFile(Object));
+  case file_magic::vpe_import_library:
+    return std::unique_ptr<SymbolicFile>(new VPEImportFile(Object));
   case file_magic::elf_relocatable:
   case file_magic::macho_object:
+  case file_magic::vpe_object:
   case file_magic::coff_object: {
     Expected<std::unique_ptr<ObjectFile>> Obj =
         ObjectFile::createObjectFile(Object, Type, InitContent);
@@ -115,13 +120,16 @@ bool SymbolicFile::isSymbolicFile(file_magic Type, const LLVMContext *Context) {
   case file_magic::macho_dsym_companion:
   case file_magic::macho_kext_bundle:
   case file_magic::macho_file_set:
+  case file_magic::vpe_executable:
   case file_magic::pecoff_executable:
   case file_magic::xcoff_object_32:
   case file_magic::xcoff_object_64:
   case file_magic::wasm_object:
+  case file_magic::vpe_import_library:
   case file_magic::coff_import_library:
   case file_magic::elf_relocatable:
   case file_magic::macho_object:
+  case file_magic::vpe_object:
   case file_magic::coff_object:
     return true;
   default:

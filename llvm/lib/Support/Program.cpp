@@ -102,6 +102,9 @@ void sys::printArg(raw_ostream &OS, StringRef Arg, bool Quote) {
 #ifdef LLVM_ON_UNIX
 #include "Unix/Program.inc"
 #endif
+#ifdef LLVM_ON_VALI
+#include "Vali/Program.inc"
+#endif
 #ifdef _WIN32
 #include "Windows/Program.inc"
 #endif

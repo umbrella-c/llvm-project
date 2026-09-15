@@ -258,6 +258,9 @@ void* __aligned_malloc_with_fallback(size_t size) {
 #if defined(_WIN32)
   if (void* dest = std::__libcpp_aligned_alloc(alignof(__aligned_type), size))
     return dest;
+#elif defined(MOLLENOS)
+    if (void* dest = std::aligned_alloc(alignof(__aligned_type), size))
+        return dest;
 #elif defined(_LIBCPP_HAS_NO_LIBRARY_ALIGNED_ALLOCATION)
   if (void* dest = ::malloc(size))
     return dest;

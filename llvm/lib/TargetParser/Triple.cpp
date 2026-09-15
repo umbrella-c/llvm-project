@@ -196,6 +196,7 @@ StringRef Triple::getVendorTypeName(VendorType Kind) {
   case PC: return "pc";
   case SCEI: return "scei";
   case SUSE: return "suse";
+  case Umbrella: return "umbrella";
   }
 
   llvm_unreachable("Invalid VendorType!");
@@ -242,6 +243,7 @@ StringRef Triple::getOSTypeName(OSType Kind) {
   case WatchOS: return "watchos";
   case Win32: return "windows";
   case ZOS: return "zos";
+  case Vali: return "vali";
   case ShaderModel: return "shadermodel";
   }
 
@@ -552,6 +554,7 @@ static Triple::VendorType parseVendor(StringRef VendorName) {
     .Case("mesa", Triple::Mesa)
     .Case("suse", Triple::SUSE)
     .Case("oe", Triple::OpenEmbedded)
+    .Case("uml", Triple::Umbrella)
     .Default(Triple::UnknownVendor);
 }
 
@@ -594,6 +597,7 @@ static Triple::OSType parseOS(StringRef OSName) {
     .StartsWith("hermit", Triple::HermitCore)
     .StartsWith("hurd", Triple::Hurd)
     .StartsWith("wasi", Triple::WASI)
+    .StartsWith("vali", Triple::Vali)
     .StartsWith("emscripten", Triple::Emscripten)
     .StartsWith("shadermodel", Triple::ShaderModel)
     .Default(Triple::UnknownOS);
@@ -649,6 +653,7 @@ static Triple::ObjectFormatType parseFormat(StringRef EnvironmentName) {
       // pattern matching.
       .EndsWith("xcoff", Triple::XCOFF)
       .EndsWith("coff", Triple::COFF)
+      .EndsWith("vpe", Triple::VPE)
       .EndsWith("elf", Triple::ELF)
       .EndsWith("goff", Triple::GOFF)
       .EndsWith("macho", Triple::MachO)
@@ -786,6 +791,8 @@ static StringRef getObjectFormatTypeName(Triple::ObjectFormatType Kind) {
     return "wasm";
   case Triple::XCOFF:
     return "xcoff";
+  case Triple::VPE:
+    return "vpe";
   case Triple::DXContainer:
     return "dxcontainer";
   case Triple::SPIRV:
@@ -807,6 +814,8 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
       return Triple::MachO;
     else if (T.isOSWindows())
       return Triple::COFF;
+    else if (T.isOSVali())
+      return Triple::VPE;
     return Triple::ELF;
 
   case Triple::aarch64_be:

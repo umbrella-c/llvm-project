@@ -191,13 +191,25 @@ MCSymbol *X86MCInstLower::GetSymbolFromOperand(const MachineOperand &MO) const {
   default:
     break;
   case X86II::MO_COFFSTUB: {
-    MachineModuleInfoCOFF &MMICOFF =
-        MF.getMMI().getObjFileInfo<MachineModuleInfoCOFF>();
-    MachineModuleInfoImpl::StubValueTy &StubSym = MMICOFF.getGVStubEntry(Sym);
-    if (!StubSym.getPointer()) {
-      assert(MO.isGlobal() && "Extern symbol not handled yet");
-      StubSym = MachineModuleInfoImpl::StubValueTy(
-          AsmPrinter.getSymbol(MO.getGlobal()), true);
+    if (TT.isOSBinFormatVPE()) {
+      MachineModuleInfoVPE &MMIVPE =
+          MF.getMMI().getObjFileInfo<MachineModuleInfoVPE>();
+      MachineModuleInfoImpl::StubValueTy &StubSym = MMIVPE.getGVStubEntry(Sym);
+      if (!StubSym.getPointer()) {
+        assert(MO.isGlobal() && "Extern symbol not handled yet");
+        StubSym = MachineModuleInfoImpl::StubValueTy(
+            AsmPrinter.getSymbol(MO.getGlobal()), true);
+      }
+    }
+    else {
+      MachineModuleInfoCOFF &MMICOFF =
+          MF.getMMI().getObjFileInfo<MachineModuleInfoCOFF>();
+      MachineModuleInfoImpl::StubValueTy &StubSym = MMICOFF.getGVStubEntry(Sym);
+      if (!StubSym.getPointer()) {
+        assert(MO.isGlobal() && "Extern symbol not handled yet");
+        StubSym = MachineModuleInfoImpl::StubValueTy(
+            AsmPrinter.getSymbol(MO.getGlobal()), true);
+      }
     }
     break;
   }

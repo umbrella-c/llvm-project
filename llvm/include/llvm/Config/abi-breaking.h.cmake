@@ -24,7 +24,7 @@
 
 // ABI_BREAKING_CHECKS protection: provides link-time failure when clients build
 // mismatch with LLVM
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(MOLLENOS)
 // Use pragma with MSVC
 #define LLVM_XSTR(s) LLVM_STR(s)
 #define LLVM_STR(s) #s

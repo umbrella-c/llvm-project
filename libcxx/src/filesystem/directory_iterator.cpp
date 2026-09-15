@@ -11,7 +11,6 @@
 #include <errno.h>
 #include <filesystem>
 #include <stack>
-
 #include "filesystem_common.h"
 
 _LIBCPP_BEGIN_NAMESPACE_FILESYSTEM

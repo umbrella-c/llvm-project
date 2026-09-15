@@ -9,6 +9,7 @@ add_llvm_component_library(LLVMMC
   MCAsmInfoGOFF.cpp
   MCAsmInfoWasm.cpp
   MCAsmInfoXCOFF.cpp
+  MCAsmInfoVPE.cpp
   MCAsmMacro.cpp
   MCAsmStreamer.cpp
   MCAssembler.cpp
@@ -45,6 +46,7 @@ add_llvm_component_library(LLVMMC
   MCSectionMachO.cpp
   MCSectionWasm.cpp
   MCSectionXCOFF.cpp
+  MCSectionVPE.cpp
   MCStreamer.cpp
   MCSPIRVStreamer.cpp
   MCSubtargetInfo.cpp
@@ -58,6 +60,7 @@ add_llvm_component_library(LLVMMC
   MCWasmStreamer.cpp
   MCWin64EH.cpp
   MCWinCOFFStreamer.cpp
+  MCVPEStreamer.cpp
   MCWinEH.cpp
   MCXCOFFObjectTargetWriter.cpp
   MCXCOFFStreamer.cpp
@@ -69,6 +72,7 @@ add_llvm_component_library(LLVMMC
   WasmObjectWriter.cpp
   WinCOFFObjectWriter.cpp
   XCOFFObjectWriter.cpp
+  VPEObjectWriter.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${LLVM_MAIN_INCLUDE_DIR}/llvm/MC

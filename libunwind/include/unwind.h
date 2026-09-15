@@ -81,15 +81,15 @@ extern _Unwind_Reason_Code
     _Unwind_SjLj_ForcedUnwind(_Unwind_Exception *exception_object,
                               _Unwind_Stop_Fn stop, void *stop_parameter);
 #else
-extern _Unwind_Reason_Code
+_LIBUNWIND_EXPORT _Unwind_Reason_Code
     _Unwind_ForcedUnwind(_Unwind_Exception *exception_object,
                          _Unwind_Stop_Fn stop, void *stop_parameter);
 #endif
 
 #ifdef __USING_SJLJ_EXCEPTIONS__
 typedef struct _Unwind_FunctionContext *_Unwind_FunctionContext_t;
-extern void _Unwind_SjLj_Register(_Unwind_FunctionContext_t fc);
-extern void _Unwind_SjLj_Unregister(_Unwind_FunctionContext_t fc);
+_LIBUNWIND_EXPORT void _Unwind_SjLj_Register(_Unwind_FunctionContext_t fc);
+_LIBUNWIND_EXPORT void _Unwind_SjLj_Unregister(_Unwind_FunctionContext_t fc);
 #endif
 
 //
@@ -100,10 +100,10 @@ extern void _Unwind_SjLj_Unregister(_Unwind_FunctionContext_t fc);
 //  called by __cxa_rethrow().
 //
 #ifdef __USING_SJLJ_EXCEPTIONS__
-extern _Unwind_Reason_Code
+_LIBUNWIND_EXPORT _Unwind_Reason_Code
     _Unwind_SjLj_Resume_or_Rethrow(_Unwind_Exception *exception_object);
 #else
-extern _Unwind_Reason_Code
+_LIBUNWIND_EXPORT _Unwind_Reason_Code
     _Unwind_Resume_or_Rethrow(_Unwind_Exception *exception_object);
 #endif
 
@@ -112,12 +112,12 @@ extern _Unwind_Reason_Code
 // or the _Unwind_Trace_Fn function returns something other than _URC_NO_REASON.
 typedef _Unwind_Reason_Code (*_Unwind_Trace_Fn)(struct _Unwind_Context *,
                                                 void *);
-extern _Unwind_Reason_Code _Unwind_Backtrace(_Unwind_Trace_Fn, void *);
+_LIBUNWIND_EXPORT _Unwind_Reason_Code _Unwind_Backtrace(_Unwind_Trace_Fn, void *);
 
 // _Unwind_GetCFA is a gcc extension that can be called from within a
 // personality handler to get the CFA (stack pointer before call) of
 // current frame.
-extern uintptr_t _Unwind_GetCFA(struct _Unwind_Context *);
+_LIBUNWIND_EXPORT uintptr_t _Unwind_GetCFA(struct _Unwind_Context *);
 
 
 // _Unwind_GetIPInfo is a gcc extension that can be called from within a
@@ -126,7 +126,7 @@ extern uintptr_t _Unwind_GetCFA(struct _Unwind_Context *);
 // instruction causing the unwind. Normally, in a function call, the IP returned
 // is the return address which is after the call instruction and may be past the
 // end of the function containing the call instruction.
-extern uintptr_t _Unwind_GetIPInfo(struct _Unwind_Context *context,
+_LIBUNWIND_EXPORT uintptr_t _Unwind_GetIPInfo(struct _Unwind_Context *context,
                                    int *ipBefore);
 
 
@@ -136,8 +136,8 @@ extern uintptr_t _Unwind_GetIPInfo(struct _Unwind_Context *context,
 // __register_frame() has existed in all versions of Mac OS X, but in 10.4 and
 // 10.5 it was buggy and did not actually register the FDE with the unwinder.
 // In 10.6 and later it does register properly.
-extern void __register_frame(const void *fde);
-extern void __deregister_frame(const void *fde);
+_LIBUNWIND_EXPORT void __register_frame(const void *fde);
+_LIBUNWIND_EXPORT void __deregister_frame(const void *fde);
 
 // _Unwind_Find_FDE() will locate the FDE if the pc is in some function that has
 // an associated FDE. Note, Mac OS X 10.6 and later, introduces "compact unwind
@@ -149,7 +149,7 @@ struct dwarf_eh_bases {
   uintptr_t dbase;
   uintptr_t func;
 };
-extern const void *_Unwind_Find_FDE(const void *pc, struct dwarf_eh_bases *);
+_LIBUNWIND_EXPORT const void *_Unwind_Find_FDE(const void *pc, struct dwarf_eh_bases *);
 
 
 // This function attempts to find the start (address of first instruction) of
@@ -157,32 +157,32 @@ extern const void *_Unwind_Find_FDE(const void *pc, struct dwarf_eh_bases *);
 // function has an FDE (DWARF unwind info).
 // This function is unimplemented on Mac OS X 10.6 and later.  Instead, use
 // _Unwind_Find_FDE() and look at the dwarf_eh_bases.func result.
-extern void *_Unwind_FindEnclosingFunction(void *pc);
+_LIBUNWIND_EXPORT void *_Unwind_FindEnclosingFunction(void *pc);
 
 // Mac OS X does not support text-rel and data-rel addressing so these functions
 // are unimplemented.
-extern uintptr_t _Unwind_GetDataRelBase(struct _Unwind_Context *context)
+_LIBUNWIND_EXPORT uintptr_t _Unwind_GetDataRelBase(struct _Unwind_Context *context)
     LIBUNWIND_UNAVAIL;
-extern uintptr_t _Unwind_GetTextRelBase(struct _Unwind_Context *context)
+_LIBUNWIND_EXPORT uintptr_t _Unwind_GetTextRelBase(struct _Unwind_Context *context)
     LIBUNWIND_UNAVAIL;
 
 // Mac OS X 10.4 and 10.5 had implementations of these functions in
 // libgcc_s.dylib, but they never worked.
 /// These functions are no longer available on Mac OS X.
-extern void __register_frame_info_bases(const void *fde, void *ob, void *tb,
+_LIBUNWIND_EXPORT void __register_frame_info_bases(const void *fde, void *ob, void *tb,
                                         void *db) LIBUNWIND_UNAVAIL;
-extern void __register_frame_info(const void *fde, void *ob)
+_LIBUNWIND_EXPORT void __register_frame_info(const void *fde, void *ob)
     LIBUNWIND_UNAVAIL;
-extern void __register_frame_info_table_bases(const void *fde, void *ob,
+_LIBUNWIND_EXPORT void __register_frame_info_table_bases(const void *fde, void *ob,
                                               void *tb, void *db)
     LIBUNWIND_UNAVAIL;
-extern void __register_frame_info_table(const void *fde, void *ob)
+_LIBUNWIND_EXPORT void __register_frame_info_table(const void *fde, void *ob)
     LIBUNWIND_UNAVAIL;
-extern void __register_frame_table(const void *fde)
+_LIBUNWIND_EXPORT void __register_frame_table(const void *fde)
     LIBUNWIND_UNAVAIL;
-extern void *__deregister_frame_info(const void *fde)
+_LIBUNWIND_EXPORT void *__deregister_frame_info(const void *fde)
     LIBUNWIND_UNAVAIL;
-extern void *__deregister_frame_info_bases(const void *fde)
+_LIBUNWIND_EXPORT void *__deregister_frame_info_bases(const void *fde)
     LIBUNWIND_UNAVAIL;
 
 #if defined(__SEH__) && !defined(__USING_SJLJ_EXCEPTIONS__)
@@ -194,7 +194,7 @@ typedef struct _DISPATCHER_CONTEXT DISPATCHER_CONTEXT;
 typedef struct _DISPATCHER_CONTEXT DISPATCHER_CONTEXT;
 #endif
 // This is the common wrapper for GCC-style personality functions with SEH.
-extern EXCEPTION_DISPOSITION _GCC_specific_handler(EXCEPTION_RECORD *exc,
+_LIBUNWIND_EXPORT EXCEPTION_DISPOSITION _GCC_specific_handler(EXCEPTION_RECORD *exc,
                                                    void *frame, CONTEXT *ctx,
                                                    DISPATCHER_CONTEXT *disp,
                                                    _Unwind_Personality_Fn pers);

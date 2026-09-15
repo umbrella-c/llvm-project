@@ -106,6 +106,7 @@ private:
   StringRef doFindFile(StringRef filename);
   StringRef doFindLib(StringRef filename);
   StringRef doFindLibMinGW(StringRef filename);
+  StringRef doFindLibVPE(StringRef filename);
 
   bool findUnderscoreMangle(StringRef sym);
 

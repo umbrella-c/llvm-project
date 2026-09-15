@@ -27,6 +27,9 @@
 #include "Unix/Host.inc"
 #include <sched.h>
 #endif
+#ifdef LLVM_ON_VALI
+#include "Vali/Host.inc"
+#endif
 #ifdef _WIN32
 #include "Windows/Host.inc"
 #endif

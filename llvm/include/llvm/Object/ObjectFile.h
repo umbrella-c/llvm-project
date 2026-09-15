@@ -37,6 +37,7 @@ class SubtargetFeatures;
 namespace object {
 
 class COFFObjectFile;
+class VPEObjectFile;
 class MachOObjectFile;
 class ObjectFile;
 class SectionRef;
@@ -383,6 +384,9 @@ public:
 
   static Expected<std::unique_ptr<ObjectFile>>
   createXCOFFObjectFile(MemoryBufferRef Object, unsigned FileType);
+
+  static Expected<std::unique_ptr<VPEObjectFile>>
+  createVPEObjectFile(MemoryBufferRef Object);
 
   static Expected<std::unique_ptr<ObjectFile>>
   createELFObjectFile(MemoryBufferRef Object, bool InitContent = true);

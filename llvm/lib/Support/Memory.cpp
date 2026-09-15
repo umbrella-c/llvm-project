@@ -22,6 +22,9 @@
 #ifdef LLVM_ON_UNIX
 #include "Unix/Memory.inc"
 #endif
+#ifdef LLVM_ON_VALI
+#include "Vali/Memory.inc"
+#endif
 #ifdef _WIN32
 #include "Windows/Memory.inc"
 #endif

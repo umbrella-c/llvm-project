@@ -117,6 +117,8 @@ static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
     return std::make_unique<TargetLoweringObjectFileMachO>();
   if (TT.isOSWindows())
     return std::make_unique<TargetLoweringObjectFileCOFF>();
+  if (TT.isOSVali())
+    return std::make_unique<TargetLoweringObjectFileVPE>();
   return std::make_unique<ARMElfTargetObjectFile>();
 }
 
@@ -243,7 +245,7 @@ ARMBaseTargetMachine::ARMBaseTargetMachine(const Target &T, const Triple &TT,
          TargetTriple.getEnvironment() == Triple::GNUEABIHF ||
          TargetTriple.getEnvironment() == Triple::MuslEABI ||
          TargetTriple.getEnvironment() == Triple::MuslEABIHF) &&
-        !(TargetTriple.isOSWindows() || TargetTriple.isOSDarwin()))
+        !(TargetTriple.isOSWindows() || TargetTriple.isOSVali() || TargetTriple.isOSDarwin()))
       this->Options.EABIVersion = EABI::GNU;
     else
       this->Options.EABIVersion = EABI::EABI5;

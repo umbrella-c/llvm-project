@@ -11,6 +11,7 @@
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/COFF.h"
 #include "llvm/Object/Minidump.h"
+#include "llvm/Object/VPE.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/InitLLVM.h"
@@ -41,6 +42,9 @@ static Error dumpObject(const ObjectFile &Obj, raw_ostream &OS) {
 
   if (Obj.isXCOFF())
     return xcoff2yaml(OS, cast<XCOFFObjectFile>(Obj));
+
+  if (Obj.isVPE())
+    return errorCodeToError(vpe2yaml(outs(), cast<VPEObjectFile>(Obj)));
 
   if (Obj.isELF())
     return elf2yaml(OS, Obj);

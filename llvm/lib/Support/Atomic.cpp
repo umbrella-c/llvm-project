@@ -27,6 +27,10 @@ using namespace llvm;
 #define GNU_ATOMICS
 #endif
 
+#if defined(__clang__) && !defined(GNU_ATOMICS) && defined(LLVM_ON_VALI)
+#define GNU_ATOMICS
+#endif
+
 void sys::MemoryFence() {
 #if LLVM_HAS_ATOMICS == 0
   return;

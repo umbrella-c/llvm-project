@@ -748,7 +748,8 @@ public:
         "objc_loadClassref",
         llvm::AttributeList::get(CGM.getLLVMContext(),
                                  llvm::AttributeList::FunctionIndex, AS));
-    if (!CGM.getTriple().isOSBinFormatCOFF())
+    bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+    if (!IsVPEOrCOFF)
       cast<llvm::Function>(F.getCallee())->setLinkage(
         llvm::Function::ExternalWeakLinkage);
 
@@ -5070,6 +5071,7 @@ std::string CGObjCCommonMac::GetSectionName(StringRef Section,
     assert(Section.substr(0, 2) == "__" &&
            "expected the name to begin with __");
     return Section.substr(2).str();
+  case llvm::Triple::VPE:
   case llvm::Triple::COFF:
     assert(Section.substr(0, 2) == "__" &&
            "expected the name to begin with __");
@@ -6441,7 +6443,8 @@ CGObjCNonFragileABIMac::BuildClassObject(const ObjCInterfaceDecl *CI,
   if (CGM.getTriple().isOSBinFormatMachO())
     GV->setSection("__DATA, __objc_data");
   GV->setAlignment(CGM.getDataLayout().getABITypeAlign(ObjCTypes.ClassnfABITy));
-  if (!CGM.getTriple().isOSBinFormatCOFF())
+  bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+  if (!IsVPEOrCOFF)
     if (HiddenVisibility)
       GV->setVisibility(llvm::GlobalValue::HiddenVisibility);
   return GV;
@@ -6496,7 +6499,8 @@ void CGObjCNonFragileABIMac::GenerateClass(const ObjCImplementationDecl *ID) {
         new llvm::GlobalVariable(CGM.getModule(), ObjCTypes.CacheTy, false,
                                  llvm::GlobalValue::ExternalLinkage, nullptr,
                                  "_objc_empty_cache");
-    if (CGM.getTriple().isOSBinFormatCOFF())
+    bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+    if (IsVPEOrCOFF)
       ObjCEmptyCacheVar->setDLLStorageClass(getStorage(CGM, "_objc_empty_cache"));
 
     // Only OS X with deployment version <10.9 use the empty vtable symbol
@@ -6523,7 +6527,8 @@ void CGObjCNonFragileABIMac::GenerateClass(const ObjCImplementationDecl *ID) {
   assert(CI && "CGObjCNonFragileABIMac::GenerateClass - class is 0");
 
   // Build the flags for the metaclass.
-  bool classIsHidden = (CGM.getTriple().isOSBinFormatCOFF())
+  bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+  bool classIsHidden = (IsVPEOrCOFF)
                            ? !CI->hasAttr<DLLExportAttr>()
                            : CI->getVisibility() == HiddenVisibility;
   if (classIsHidden)
@@ -6876,7 +6881,8 @@ CGObjCNonFragileABIMac::ObjCIvarOffsetVariable(const ObjCInterfaceDecl *ID,
         new llvm::GlobalVariable(CGM.getModule(), ObjCTypes.IvarOffsetVarTy,
                                  false, llvm::GlobalValue::ExternalLinkage,
                                  nullptr, Name.str());
-    if (CGM.getTriple().isOSBinFormatCOFF()) {
+    bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+    if (IsVPEOrCOFF) {
       bool IsPrivateOrPackage =
           Ivar->getAccessControl() == ObjCIvarDecl::Private ||
           Ivar->getAccessControl() == ObjCIvarDecl::Package;
@@ -6904,7 +6910,8 @@ CGObjCNonFragileABIMac::EmitIvarOffsetVar(const ObjCInterfaceDecl *ID,
   IvarOffsetGV->setAlignment(
       CGM.getDataLayout().getABITypeAlign(ObjCTypes.IvarOffsetVarTy));
 
-  if (!CGM.getTriple().isOSBinFormatCOFF()) {
+  bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+  if (!IsVPEOrCOFF) {
     // FIXME: This matches gcc, but shouldn't the visibility be set on the use
     // as well (i.e., in ObjCIvarOffsetVariable).
     if (Ivar->getAccessControl() == ObjCIvarDecl::Private ||
@@ -7401,11 +7408,12 @@ CGObjCNonFragileABIMac::GetClassGlobal(const ObjCInterfaceDecl *ID,
                                        ForDefinition_t isForDefinition) {
   auto prefix =
     (metaclass ? getMetaclassSymbolPrefix() : getClassSymbolPrefix());
+  bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
   return GetClassGlobal((prefix + ID->getObjCRuntimeNameAsString()).str(),
                         isForDefinition,
                         ID->isWeakImported(),
                         !isForDefinition
-                          && CGM.getTriple().isOSBinFormatCOFF()
+                          && IsVPEOrCOFF
                           && ID->hasAttr<DLLImportAttr>());
 }
 
@@ -7791,7 +7799,8 @@ CGObjCNonFragileABIMac::GetEHType(QualType T) {
           new llvm::GlobalVariable(CGM.getModule(), ObjCTypes.EHTypeTy, false,
                                    llvm::GlobalValue::ExternalLinkage, nullptr,
                                    "OBJC_EHTYPE_id");
-      if (CGM.getTriple().isOSBinFormatCOFF())
+      bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+      if (IsVPEOrCOFF)
         IDEHType->setDLLStorageClass(getStorage(CGM, "OBJC_EHTYPE_id"));
     }
     return IDEHType;
@@ -7869,7 +7878,8 @@ CGObjCNonFragileABIMac::GetInterfaceEHType(const ObjCInterfaceDecl *ID,
         new llvm::GlobalVariable(CGM.getModule(), ObjCTypes.Int8PtrTy, false,
                                  llvm::GlobalValue::ExternalLinkage, nullptr,
                                  VTableName);
-    if (CGM.getTriple().isOSBinFormatCOFF())
+    bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+    if (IsVPEOrCOFF)
       VTableGV->setDLLStorageClass(getStorage(CGM, VTableName));
   }
 
@@ -7898,7 +7908,8 @@ CGObjCNonFragileABIMac::GetInterfaceEHType(const ObjCInterfaceDecl *ID,
   }
   assert(Entry->getLinkage() == L);
 
-  if (!CGM.getTriple().isOSBinFormatCOFF())
+  bool IsVPEOrCOFF = CGM.getTriple().isOSBinFormatCOFF() || CGM.getTriple().isOSBinFormatVPE();
+  if (!IsVPEOrCOFF)
     if (ID->getVisibility() == HiddenVisibility)
       Entry->setVisibility(llvm::GlobalValue::HiddenVisibility);
 

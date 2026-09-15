@@ -15,6 +15,7 @@
 #include "llvm/BinaryFormat/Magic.h"
 #include "llvm/Object/Binary.h"
 #include "llvm/Object/COFF.h"
+#include "llvm/Object/VPE.h"
 #include "llvm/Object/Error.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/Wasm.h"
@@ -129,6 +130,8 @@ Triple ObjectFile::makeTriple() const {
     // XCOFF implies AIX.
     TheTriple.setOS(Triple::AIX);
     TheTriple.setObjectFormat(Triple::XCOFF);
+  } else if (isVPE()) {
+    TheTriple.setObjectFormat(Triple::VPE);
   }
 
   return TheTriple;
@@ -186,6 +189,10 @@ ObjectFile::createObjectFile(MemoryBufferRef Object, file_magic Type,
     return createXCOFFObjectFile(Object, Binary::ID_XCOFF64);
   case file_magic::wasm_object:
     return createWasmObjectFile(Object);
+  case file_magic::vpe_object:
+  case file_magic::vpe_import_library:
+  case file_magic::vpe_executable:
+    return createVPEObjectFile(Object);
   }
   llvm_unreachable("Unexpected Object File Type");
 }

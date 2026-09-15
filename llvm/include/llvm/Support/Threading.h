@@ -21,7 +21,7 @@
 #include <ciso646> // So we can check the C++ standard lib macros.
 #include <optional>
 
-#if defined(_MSC_VER)
+#if defined(_MSC_VER) || defined(MOLLENOS)
 // MSVC's call_once implementation worked since VS 2015, which is the minimum
 // supported version as of this writing.
 #define LLVM_THREADING_USE_STD_CALL_ONCE 1

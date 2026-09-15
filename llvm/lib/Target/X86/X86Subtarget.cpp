@@ -104,7 +104,7 @@ X86Subtarget::classifyLocalReference(const GlobalValue *GV) const {
   }
 
   // The COFF dynamic linker just patches the executable sections.
-  if (isTargetCOFF())
+  if (isTargetCOFF() || isTargetVPE())
     return X86II::MO_NO_FLAG;
 
   if (isTargetDarwin()) {
@@ -143,7 +143,7 @@ unsigned char X86Subtarget::classifyGlobalReference(const GlobalValue *GV,
   if (TM.shouldAssumeDSOLocal(GV))
     return classifyLocalReference(GV);
 
-  if (isTargetCOFF()) {
+  if (isTargetCOFF() || isTargetVPE()) {
     // ExternalSymbolSDNode like _tls_index.
     if (!GV)
       return X86II::MO_NO_FLAG;
@@ -152,7 +152,7 @@ unsigned char X86Subtarget::classifyGlobalReference(const GlobalValue *GV,
     return X86II::MO_COFFSTUB;
   }
   // Some JIT users use *-win32-elf triples; these shouldn't use GOT tables.
-  if (isOSWindows())
+  if (isOSWindows() || isOSVali())
     return X86II::MO_NO_FLAG;
 
   if (is64Bit()) {
@@ -197,7 +197,7 @@ X86Subtarget::classifyGlobalFunctionReference(const GlobalValue *GV,
   // - They are intrinsic functions (!GV)
   // - They are marked dllimport
   // - They are extern_weak, and a stub is needed
-  if (isTargetCOFF()) {
+  if (isTargetCOFF() || isTargetVPE()) {
     if (!GV)
       return X86II::MO_NO_FLAG;
     if (GV->hasDLLImportStorageClass())
@@ -333,7 +333,7 @@ X86Subtarget::X86Subtarget(const Triple &TT, StringRef CPU, StringRef TuneCPU,
     setPICStyle(PICStyles::Style::None);
   else if (is64Bit())
     setPICStyle(PICStyles::Style::RIPRel);
-  else if (isTargetCOFF())
+  else if (isTargetCOFF() || isTargetVPE())
     setPICStyle(PICStyles::Style::None);
   else if (isTargetDarwin())
     setPICStyle(PICStyles::Style::StubPIC);

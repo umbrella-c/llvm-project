@@ -1120,6 +1120,8 @@ StringRef SymbolTable::findDefaultEntry() {
 }
 
 WindowsSubsystem SymbolTable::inferSubsystem() {
+  if (ctx.config.vpe)
+    return IMAGE_SUBSYSTEM_NATIVE;
   if (ctx.config.dll)
     return IMAGE_SUBSYSTEM_WINDOWS_GUI;
   if (ctx.config.mingw)

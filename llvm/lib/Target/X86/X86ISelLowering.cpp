@@ -2709,7 +2709,7 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
   setOperationAction(ISD::FSINCOS, MVT::f64, Expand);
   setOperationAction(ISD::FSINCOS, MVT::f32, Expand);
 
-  if (Subtarget.isTargetWin64()) {
+  if (Subtarget.isTargetWin64ABI()) {
     setOperationAction(ISD::SDIV, MVT::i128, Custom);
     setOperationAction(ISD::UDIV, MVT::i128, Custom);
     setOperationAction(ISD::SREM, MVT::i128, Custom);
@@ -20097,7 +20097,7 @@ X86TargetLowering::LowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const {
     return DAG.getCopyFromReg(Chain, DL, Reg, PtrVT, Chain.getValue(1));
   }
 
-  if (Subtarget.isOSWindows()) {
+  if (Subtarget.isOSWindows() || Subtarget.isOSVali()) {
     // Just use the implicit TLS architecture
     // Need to generate something similar to:
     //   mov     rdx, qword [gs:abs 58H]; Load pointer to ThreadLocalStorage
@@ -20114,22 +20114,28 @@ X86TargetLowering::LowerGlobalTLSAddress(SDValue Op, SelectionDAG &DAG) const {
 
     // Get the Thread Pointer, which is %fs:__tls_array (32-bit) or
     // %gs:0x58 (64-bit). On MinGW, __tls_array is not available, so directly
-    // use its literal value of 0x2C.
+    // use its literal value of 0x2C. Vali publishes its TLS array in GS
+    // reserved slot 11 on both architectures (0x2C / 0x58). Its CRT assigns
+    // module indices dynamically, including for local-exec variables.
     Value *Ptr = Constant::getNullValue(
-        Subtarget.is64Bit() ? PointerType::get(*DAG.getContext(), X86AS::GS)
-                            : PointerType::get(*DAG.getContext(), X86AS::FS));
+        (Subtarget.is64Bit() || Subtarget.isOSVali())
+            ? PointerType::get(*DAG.getContext(), X86AS::GS)
+            : PointerType::get(*DAG.getContext(), X86AS::FS));
 
-    SDValue TlsArray = Subtarget.is64Bit()
-                           ? DAG.getIntPtrConstant(0x58, dl)
-                           : (Subtarget.isTargetWindowsGNU()
-                                  ? DAG.getIntPtrConstant(0x2C, dl)
-                                  : DAG.getExternalSymbol("_tls_array", PtrVT));
+    SDValue TlsArray;
+    if (Subtarget.is64Bit())
+      TlsArray = DAG.getIntPtrConstant(0x58, dl);
+    else if (Subtarget.isTargetWindowsGNU() || Subtarget.isOSVali())
+      TlsArray = DAG.getIntPtrConstant(0x2C, dl);
+    else
+      TlsArray = DAG.getExternalSymbol("_tls_array", PtrVT);
 
     SDValue ThreadPointer =
         DAG.getLoad(PtrVT, dl, Chain, TlsArray, MachinePointerInfo(Ptr));
 
     SDValue res;
-    if (GV->getThreadLocalMode() == GlobalVariable::LocalExecTLSModel) {
+    if (!Subtarget.isOSVali() &&
+        GV->getThreadLocalMode() == GlobalVariable::LocalExecTLSModel) {
       res = ThreadPointer;
     } else {
       // Load the _tls_index variable
@@ -20578,7 +20584,7 @@ SDValue X86TargetLowering::LowerSINT_TO_FP(SDValue Op,
   else if (isLegalConversion(SrcVT, VT, true, Subtarget))
     return Op;
 
-  if (Subtarget.isTargetWin64() && SrcVT == MVT::i128)
+  if (Subtarget.isTargetWin64ABI() && SrcVT == MVT::i128)
     return LowerWin64_INT128_TO_FP(Op, DAG);
 
   if (SDValue Extract = vectorizeExtractedCast(Op, dl, DAG, Subtarget))
@@ -21084,7 +21090,7 @@ SDValue X86TargetLowering::LowerUINT_TO_FP(SDValue Op,
   else if (isLegalConversion(SrcVT, DstVT, false, Subtarget))
     return Op;
 
-  if (Subtarget.isTargetWin64() && SrcVT == MVT::i128)
+  if (Subtarget.isTargetWin64ABI() && SrcVT == MVT::i128)
     return LowerWin64_INT128_TO_FP(Op, DAG);
 
   if (SDValue Extract = vectorizeExtractedCast(Op, dl, DAG, Subtarget))
@@ -30734,7 +30740,7 @@ static SDValue LowerMULO(SDValue Op, const X86Subtarget &Subtarget,
 }
 
 SDValue X86TargetLowering::LowerWin64_i128OP(SDValue Op, SelectionDAG &DAG) const {
-  assert(Subtarget.isTargetWin64() && "Unexpected target");
+  assert(Subtarget.isTargetWin64ABI() && "Unexpected target");
   EVT VT = Op.getValueType();
   assert(VT.isInteger() && VT.getSizeInBits() == 128 &&
          "Unexpected return type for lowering");
@@ -30798,7 +30804,7 @@ SDValue X86TargetLowering::LowerWin64_i128OP(SDValue Op, SelectionDAG &DAG) cons
 SDValue X86TargetLowering::LowerWin64_FP_TO_INT128(SDValue Op,
                                                    SelectionDAG &DAG,
                                                    SDValue &Chain) const {
-  assert(Subtarget.isTargetWin64() && "Unexpected target");
+  assert(Subtarget.isTargetWin64ABI() && "Unexpected target");
   EVT VT = Op.getValueType();
   bool IsStrict = Op->isStrictFPOpcode();
 
@@ -30831,7 +30837,7 @@ SDValue X86TargetLowering::LowerWin64_FP_TO_INT128(SDValue Op,
 
 SDValue X86TargetLowering::LowerWin64_INT128_TO_FP(SDValue Op,
                                                    SelectionDAG &DAG) const {
-  assert(Subtarget.isTargetWin64() && "Unexpected target");
+  assert(Subtarget.isTargetWin64ABI() && "Unexpected target");
   EVT VT = Op.getValueType();
   bool IsStrict = Op->isStrictFPOpcode();
 
@@ -35674,7 +35680,7 @@ void X86TargetLowering::ReplaceNodeResults(SDNode *N,
       return;
     }
 
-    if (VT == MVT::i128 && Subtarget.isTargetWin64()) {
+    if (VT == MVT::i128 && Subtarget.isTargetWin64ABI()) {
       SDValue Chain;
       SDValue V = LowerWin64_FP_TO_INT128(SDValue(N, 0), DAG, Chain);
       Results.push_back(V);
@@ -64674,8 +64680,8 @@ bool X86TargetLowering::hasStackProbeSymbol(const MachineFunction &MF) const {
 /// Returns true if stack probing through inline assembly is requested.
 bool X86TargetLowering::hasInlineStackProbe(const MachineFunction &MF) const {
 
-  // No inline stack probe for Windows, they have their own mechanism.
-  if (Subtarget.isOSWindowsOrUEFI() ||
+  // Windows and Vali have runtime-provided stack probes.
+  if (Subtarget.isOSWindowsOrUEFI() || Subtarget.isOSVali() ||
       MF.getFunction().hasFnAttribute("no-stack-arg-probe"))
     return false;
 
@@ -64699,13 +64705,14 @@ X86TargetLowering::getStackProbeSymbolName(const MachineFunction &MF) const {
   if (MF.getFunction().hasFnAttribute("probe-stack"))
     return MF.getFunction().getFnAttribute("probe-stack").getValueAsString();
 
-  // Generally, if we aren't on Windows, the platform ABI does not include
+  // Generally, outside Windows and Vali, the platform ABI does not include
   // support for stack probes, so don't emit them.
-  if (!Subtarget.isOSWindowsOrUEFI() || Subtarget.isTargetMachO() ||
+  if ((!Subtarget.isOSWindowsOrUEFI() && !Subtarget.isOSVali()) ||
+      Subtarget.isTargetMachO() ||
       MF.getFunction().hasFnAttribute("no-stack-arg-probe"))
     return "";
 
-  // We need a stack probe to conform to the Windows ABI. Choose the right
+  // We need a stack probe to conform to the platform ABI. Choose the right
   // symbol.
   RTLIB::LibcallImpl StackProbeImpl = getLibcallImpl(RTLIB::STACK_PROBE);
   if (StackProbeImpl == RTLIB::Unsupported)

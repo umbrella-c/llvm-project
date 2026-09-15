@@ -688,9 +688,14 @@ void MCObjectFileInfo::initGOFFMCObjectFileInfo(const Triple &T) {
 }
 
 void MCObjectFileInfo::initCOFFMCObjectFileInfo(const Triple &T) {
-  EHFrameSection =
-      Ctx->getCOFFSection(".eh_frame", COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
-                                           COFF::IMAGE_SCN_MEM_READ);
+  EHFrameSection = Ctx->getCOFFSection(
+      ".eh_frame", COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+                       COFF::IMAGE_SCN_MEM_READ |
+                       (T.isOSBinFormatVPE() ? COFF::IMAGE_SCN_MEM_WRITE : 0));
+  if (T.isOSBinFormatVPE())
+    LSDASection = Ctx->getCOFFSection(".gcc_except_table",
+                                      COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+                                          COFF::IMAGE_SCN_MEM_READ);
 
   // Set the `IMAGE_SCN_MEM_16BIT` flag when compiling for thumb mode.  This is
   // used to indicate to the linker that the text segment contains thumb instructions
@@ -1228,6 +1233,8 @@ MCSection *MCObjectFileInfo::getDwarfComdatSection(const char *Name,
   case Triple::Wasm:
     return Ctx->getWasmSection(Name, SectionKind::getMetadata(), 0,
                                utostr(Hash), MCSection::NonUniqueID);
+  case Triple::VPE:
+    return Ctx->getCOFFSection(Name, 0);
   case Triple::MachO:
   case Triple::COFF:
   case Triple::GOFF:

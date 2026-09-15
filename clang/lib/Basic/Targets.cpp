@@ -112,6 +112,32 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
                                            const TargetOptions &Opts) {
   llvm::Triple::OSType os = Triple.getOS();
 
+  if (Triple.isOSVali()) {
+    switch (Triple.getArch()) {
+    case llvm::Triple::x86:
+      return std::make_unique<ValiX86_32TargetInfo>(Triple, Opts);
+    case llvm::Triple::x86_64:
+      return std::make_unique<ValiX86_64TargetInfo>(Triple, Opts);
+    case llvm::Triple::arm:
+    case llvm::Triple::thumb:
+      return std::make_unique<ValiTargetInfo<ARMleTargetInfo>>(Triple, Opts);
+    case llvm::Triple::armeb:
+    case llvm::Triple::thumbeb:
+      return std::make_unique<ValiTargetInfo<ARMbeTargetInfo>>(Triple, Opts);
+    case llvm::Triple::aarch64:
+      return std::make_unique<ValiTargetInfo<AArch64leTargetInfo>>(Triple, Opts);
+    case llvm::Triple::aarch64_be:
+      return std::make_unique<ValiTargetInfo<AArch64beTargetInfo>>(Triple, Opts);
+    case llvm::Triple::mips:
+    case llvm::Triple::mipsel:
+    case llvm::Triple::mips64:
+    case llvm::Triple::mips64el:
+      return std::make_unique<ValiTargetInfo<MipsTargetInfo>>(Triple, Opts);
+    default:
+      break;
+    }
+  }
+
   switch (Triple.getArch()) {
   default:
     return nullptr;

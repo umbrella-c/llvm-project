@@ -162,7 +162,12 @@ struct _LIBCXXABI_HIDDEN __base_class_type_info
 {
 public:
     const __class_type_info* __base_type;
+#if defined(VALI)
+    // Vali uses pointer-sized signed RTTI offsets, including on LLP64.
+    ptrdiff_t __offset_flags;
+#else
     long __offset_flags;
+#endif
 
     enum __offset_flags_masks
     {

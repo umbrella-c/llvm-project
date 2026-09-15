@@ -620,6 +620,13 @@ std::unique_ptr<TargetCodeGenInfo>
 createWinX86_64TargetCodeGenInfo(CodeGenModule &CGM, X86AVXABILevel AVXLevel);
 
 std::unique_ptr<TargetCodeGenInfo>
+createValiX86_32TargetCodeGenInfo(CodeGenModule &CGM,
+                                unsigned NumRegisterParameters);
+
+std::unique_ptr<TargetCodeGenInfo>
+createValiX86_64TargetCodeGenInfo(CodeGenModule &CGM, X86AVXABILevel AVXLevel);
+
+std::unique_ptr<TargetCodeGenInfo>
 createXCoreTargetCodeGenInfo(CodeGenModule &CGM);
 
 } // namespace CodeGen

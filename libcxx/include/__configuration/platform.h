@@ -20,6 +20,8 @@
 #  define _LIBCPP_OBJECT_FORMAT_ELF 1
 #elif defined(__MACH__)
 #  define _LIBCPP_OBJECT_FORMAT_MACHO 1
+#elif defined(VALI)
+#  define _LIBCPP_OBJECT_FORMAT_VPE 1
 #elif defined(_WIN32)
 #  define _LIBCPP_OBJECT_FORMAT_COFF 1
 #elif defined(__wasm__)

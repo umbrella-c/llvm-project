@@ -174,8 +174,9 @@ public:
 // we pick a default implementation based on the platform here.
 #      ifndef _LIBCPP_TYPEINFO_COMPARISON_IMPLEMENTATION
 
-// Windows and AIX binaries can't merge typeinfos, so use the NonUnique implementation.
-#        if defined(_LIBCPP_OBJECT_FORMAT_COFF) || defined(_LIBCPP_OBJECT_FORMAT_XCOFF)
+// Windows, AIX and Vali binaries can't merge typeinfos across shared libraries.
+// Use the NonUnique implementation so equality and hashing agree across images.
+#        if defined(_LIBCPP_OBJECT_FORMAT_COFF) || defined(_LIBCPP_OBJECT_FORMAT_XCOFF) || defined(VALI)
 #          define _LIBCPP_TYPEINFO_COMPARISON_IMPLEMENTATION 2
 
 // On arm64 on Apple platforms, use the special NonUniqueARMRTTIBit implementation.

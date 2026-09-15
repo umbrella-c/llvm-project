@@ -57,6 +57,7 @@ add_clang_library(clangDriver
   ToolChains/BareMetal.cpp
   ToolChains/Clang.cpp
   ToolChains/CommonArgs.cpp
+  ToolChains/Vali.cpp
   ToolChains/CrossWindows.cpp
   ToolChains/CSKYToolChain.cpp
   ToolChains/Cuda.cpp

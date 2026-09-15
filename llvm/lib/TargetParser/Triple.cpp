@@ -461,6 +461,8 @@ StringRef Triple::getObjectFormatTypeName(ObjectFormatType Kind) {
   switch (Kind) {
   case UnknownObjectFormat:
     return "";
+  case VPE:
+    return "vpe";
   case COFF:
     return "coff";
   case ELF:
@@ -765,6 +767,7 @@ static Triple::ObjectFormatType parseFormat(StringRef EnvironmentName) {
       // pattern matching.
       .EndsWith("xcoff", Triple::XCOFF)
       .EndsWith("coff", Triple::COFF)
+      .EndsWith("vpe", Triple::VPE)
       .EndsWith("elf", Triple::ELF)
       .EndsWith("goff", Triple::GOFF)
       .EndsWith("macho", Triple::MachO)
@@ -994,6 +997,8 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
   case Triple::x86:
   case Triple::x86_64:
     switch (T.getOS()) {
+    case Triple::Vali:
+      return Triple::VPE;
     case Triple::Win32:
     case Triple::UEFI:
       return Triple::COFF;

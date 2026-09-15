@@ -1139,6 +1139,37 @@ public:
   }
 };
 
+// Vali target definitions
+template <typename Target>
+class LLVM_LIBRARY_VISIBILITY ValiTargetInfo : public OSTargetInfo<Target> {
+protected:
+  void getOSDefines(const LangOptions &Opts, const llvm::Triple &Triple,
+                    MacroBuilder &Builder) const override {
+
+    // Preserve the legacy OS spelling for existing SDK headers.
+    Builder.defineMacro("VALI");
+    Builder.defineMacro("MOLLENOS");
+
+    DefineStd(Builder, "VALI", Opts);
+    DefineStd(Builder, "MOLLENOS", Opts);
+    if (Triple.isArch64Bit()) {
+      DefineStd(Builder, "VALI64", Opts);
+      DefineStd(Builder, "MOLLENOS64", Opts);
+      Builder.defineMacro("__STDC_FORMAT_MACROS_64");
+      Builder.defineMacro("_INTEGRAL_MAX_BITS", "64");
+    } else {
+      Builder.defineMacro("_INTEGRAL_MAX_BITS", "32");
+    }
+  }
+
+public:
+  ValiTargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts)
+      : OSTargetInfo<Target>(Triple, Opts) {
+    this->WCharType = TargetInfo::UnsignedShort;
+    this->WIntType = TargetInfo::UnsignedShort;
+  }
+};
+
 } // namespace targets
 } // namespace clang
 #endif // LLVM_CLANG_LIB_BASIC_TARGETS_OSTARGETS_H

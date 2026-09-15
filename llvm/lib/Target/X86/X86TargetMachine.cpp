@@ -119,7 +119,7 @@ static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
     return std::make_unique<TargetLoweringObjectFileMachO>();
   }
 
-  if (TT.isOSBinFormatCOFF())
+  if (TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE())
     return std::make_unique<TargetLoweringObjectFileCOFF>();
 
   if (TT.isX86_64())
@@ -144,7 +144,7 @@ static Reloc::Model getEffectiveRelocModel(const Triple &TT, bool JIT,
         return Reloc::PIC_;
       return Reloc::DynamicNoPIC;
     }
-    if (TT.isOSWindows() && is64Bit)
+    if ((TT.isOSWindows() || TT.isOSVali()) && is64Bit)
       return Reloc::PIC_;
     return Reloc::Static;
   }

@@ -214,6 +214,20 @@ bool X86MCAsmInfoGNUCOFF::isValidUnquotedName(StringRef Name) const {
   return isValidX86UnquotedName(*this, Name);
 }
 
+X86VPEMCAsmInfo::X86VPEMCAsmInfo(const Triple &Triple,
+                                 const MCTargetOptions &Options)
+    : MCAsmInfoCOFF(Options) {
+  TextAlignFillValue = 0x90;
+  if (Triple.isX86_64()) {
+    InternalSymbolPrefix = ".L";
+    CodePointerSize = 8;
+  }
+  ExceptionsType = ExceptionHandling::DwarfCFI;
+  AssemblerDialect = X86AsmSyntax;
+  AllowAtInName = true;
+  initializeAtSpecifiers(atSpecifiers);
+}
+
 void X86MCAsmInfoGNUCOFF::anchor() { }
 
 X86MCAsmInfoGNUCOFF::X86MCAsmInfoGNUCOFF(const Triple &Triple,

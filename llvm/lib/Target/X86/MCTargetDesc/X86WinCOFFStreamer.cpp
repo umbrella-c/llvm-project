@@ -11,6 +11,7 @@
 #include "llvm/MC/MCAsmBackend.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCCodeEmitter.h"
+#include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCWin64EH.h"
 #include "llvm/MC/MCWinCOFFStreamer.h"
@@ -18,6 +19,21 @@
 using namespace llvm;
 
 namespace {
+class X86VPEStreamer : public MCWinCOFFStreamer {
+public:
+  using MCWinCOFFStreamer::MCWinCOFFStreamer;
+
+  void emitInstruction(const MCInst &Inst,
+                       const MCSubtargetInfo &STI) override {
+    X86_MC::emitInstruction(*this, Inst, STI);
+  }
+
+  void finishImpl() override {
+    emitFrames();
+    MCWinCOFFStreamer::finishImpl();
+  }
+};
+
 class X86WinCOFFStreamer : public MCWinCOFFStreamer {
   Win64EH::UnwindEmitter EHStreamer;
 public:
@@ -79,5 +95,7 @@ MCStreamer *
 llvm::createX86WinCOFFStreamer(MCContext &C, std::unique_ptr<MCAsmBackend> &&AB,
                                std::unique_ptr<MCObjectWriter> &&OW,
                                std::unique_ptr<MCCodeEmitter> &&CE) {
+  if (C.getTargetTriple().isOSBinFormatVPE())
+    return new X86VPEStreamer(C, std::move(AB), std::move(CE), std::move(OW));
   return new X86WinCOFFStreamer(C, std::move(AB), std::move(CE), std::move(OW));
 }

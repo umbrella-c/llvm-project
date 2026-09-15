@@ -2418,7 +2418,8 @@ void AsmPrinter::emitFunctionBody() {
   // FIXME: Hide this behind some API in e.g. MCAsmInfo or MCTargetStreamer.
   const Triple &TT = TM.getTargetTriple();
   if (!HasAnyRealCode && (MAI.hasSubsectionsViaSymbols() ||
-                          (TT.isOSWindows() && TT.isOSBinFormatCOFF()))) {
+                          (TT.isOSWindows() && TT.isOSBinFormatCOFF()) ||
+                          TT.isOSBinFormatVPE())) {
     MCInst Noop = MF->getSubtarget().getInstrInfo()->getNop();
 
     // Targets can opt-out of emitting the noop here by leaving the opcode
@@ -2977,7 +2978,7 @@ bool AsmPrinter::doFinalization(Module &M) {
     }
   }
 
-  if (Target.isOSBinFormatCOFF()) {
+  if (Target.isOSBinFormatCOFF() || Target.isOSBinFormatVPE()) {
     MachineModuleInfoCOFF &MMICOFF =
         MMI->getObjFileInfo<MachineModuleInfoCOFF>();
 
@@ -4640,7 +4641,8 @@ const MCExpr *AsmPrinter::lowerBlockAddressConstant(const BlockAddress &BA) {
 /// GetCPISymbol - Return the symbol for the specified constant pool entry.
 MCSymbol *AsmPrinter::GetCPISymbol(unsigned CPID) const {
   if (getSubtargetInfo().getTargetTriple().isWindowsMSVCEnvironment() ||
-      getSubtargetInfo().getTargetTriple().isUEFI()) {
+      getSubtargetInfo().getTargetTriple().isUEFI() ||
+      getSubtargetInfo().getTargetTriple().isOSVali()) {
     const MachineConstantPoolEntry &CPE =
         MF->getConstantPool()->getConstants()[CPID];
     if (!CPE.isMachineConstantPoolEntry()) {
@@ -4650,7 +4652,8 @@ MCSymbol *AsmPrinter::GetCPISymbol(unsigned CPID) const {
       Align Alignment = CPE.Alignment;
       auto *S = getObjFileLowering().getSectionForConstant(
           DL, Kind, C, Alignment, &MF->getFunction());
-      if (S && TM.getTargetTriple().isOSBinFormatCOFF()) {
+      if (S && (TM.getTargetTriple().isOSBinFormatCOFF() ||
+                TM.getTargetTriple().isOSBinFormatVPE())) {
         if (MCSymbol *Sym =
                 static_cast<const MCSectionCOFF *>(S)->getCOMDATSymbol()) {
           if (Sym->isUndefined())
@@ -5240,7 +5243,7 @@ void AsmPrinter::emitCOFFReplaceableFunctionData(Module &M) {
 
 void AsmPrinter::emitCOFFFeatureSymbol(Module &M) {
   const Triple &TT = TM.getTargetTriple();
-  assert(TT.isOSBinFormatCOFF());
+  assert(TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE());
 
   // Emit an absolute @feat.00 symbol.
   MCSymbol *S = MMI->getContext().getOrCreateSymbol(StringRef("@feat.00"));

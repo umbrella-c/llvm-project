@@ -5265,7 +5265,8 @@ QualType CodeGenFunction::getVarArgType(const Expr *Arg) {
   // System headers on Windows define NULL to 0 instead of 0LL on Win64. MSVC
   // implicitly widens null pointer constants that are arguments to varargs
   // functions to pointer-sized ints.
-  if (!getTarget().getTriple().isOSWindows())
+  if (!getTarget().getTriple().isOSWindows() &&
+      !getTarget().getTriple().isOSVali())
     return Arg->getType();
 
   if (Arg->getType()->isIntegerType() &&

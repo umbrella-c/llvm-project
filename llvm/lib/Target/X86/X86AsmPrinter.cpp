@@ -93,7 +93,7 @@ bool X86AsmPrinter::runOnMachineFunction(MachineFunction &MF) {
 
   SetupMachineFunction(MF);
 
-  if (Subtarget->isTargetCOFF()) {
+  if (Subtarget->isTargetCOFF() || Subtarget->isTargetVPE()) {
     bool Local = MF.getFunction().hasLocalLinkage();
     OutStreamer->beginCOFFSymbolDef(CurrentFnSym);
     OutStreamer->emitCOFFSymbolStorageClass(
@@ -958,8 +958,10 @@ void X86AsmPrinter::emitStartOfAsmFile(Module &M) {
   if (TT.isOSBinFormatMachO())
     OutStreamer->switchSection(getObjFileLowering().getTextSection());
 
-  if (TT.isOSBinFormatCOFF()) {
+  if (TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE())
     emitCOFFFeatureSymbol(M);
+
+  if (TT.isOSBinFormatCOFF()) {
     emitCOFFReplaceableFunctionData(M);
 
     if (M.getModuleFlag("import-call-optimization"))
@@ -1076,7 +1078,7 @@ void X86AsmPrinter::emitEndOfAsmFile(Module &M) {
     // stripping. Since LLVM never generates code that does this, it is always
     // safe to set.
     OutStreamer->emitSubsectionsViaSymbols();
-  } else if (TT.isOSBinFormatCOFF()) {
+  } else if (TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE()) {
     // If import call optimization is enabled, emit the appropriate section.
     // We do this whether or not we recorded any items.
     if (EnableImportCallOptimization) {

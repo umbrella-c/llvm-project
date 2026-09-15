@@ -3352,7 +3352,8 @@ void ItaniumCXXABI::EmitThreadLocalInitFuncs(
     if (Init) {
       Init->setVisibility(Var->getVisibility());
       // Don't mark an extern_weak function DSO local on windows.
-      if (!CGM.getTriple().isOSWindows() || !Init->hasExternalWeakLinkage())
+      if ((!CGM.getTriple().isOSWindows() && !CGM.getTriple().isOSVali()) ||
+          !Init->hasExternalWeakLinkage())
         Init->setDSOLocal(Var->isDSOLocal());
     }
 
@@ -3891,7 +3892,7 @@ static bool ShouldUseExternalRTTIDescriptor(CodeGenModule &CGM,
     bool IsDLLImport = RD->hasAttr<DLLImportAttr>();
 
     // Don't import the RTTI but emit it locally.
-    if (CGM.getTriple().isOSCygMing())
+    if (CGM.getTriple().isOSCygMing() || CGM.getTriple().isOSVali())
       return false;
 
     if (CGM.getVTables().isVTableExternal(RD)) {
@@ -4175,9 +4176,9 @@ static llvm::GlobalVariable::LinkageTypes getTypeInfoLinkage(CodeGenModule &CGM,
         if (RD->hasAttr<DLLImportAttr>() &&
             ShouldUseExternalRTTIDescriptor(CGM, Ty))
           return llvm::GlobalValue::ExternalLinkage;
-      // MinGW always uses LinkOnceODRLinkage for type info.
+      // MinGW and Vali always use LinkOnceODRLinkage for type info.
       if (RD->isDynamicClass() &&
-          !CGM.getContext().getTargetInfo().getTriple().isOSCygMing())
+          !CGM.getTriple().isOSCygMing() && !CGM.getTriple().isOSVali())
         return CGM.getVTableLinkage(RD);
     }
 
@@ -4227,8 +4228,8 @@ llvm::Constant *ItaniumRTTIBuilder::BuildTypeInfo(QualType Ty) {
   llvm::GlobalValue::DLLStorageClassTypes DLLStorageClass =
       llvm::GlobalValue::DefaultStorageClass;
   if (auto RD = Ty->getAsCXXRecordDecl()) {
-    if ((CGM.getTriple().isWindowsItaniumEnvironment() &&
-         RD->hasAttr<DLLExportAttr>()) ||
+    if (((CGM.getTriple().isWindowsItaniumEnvironment() ||
+          CGM.getTriple().isOSVali()) && RD->hasAttr<DLLExportAttr>()) ||
         (CGM.shouldMapVisibilityToDLLExport(RD) &&
          !llvm::GlobalValue::isLocalLinkage(Linkage) &&
          llvmVisibility == llvm::GlobalValue::DefaultVisibility))
@@ -4575,7 +4576,7 @@ void ItaniumRTTIBuilder::BuildVMIClassTypeInfo(const CXXRecordDecl *RD) {
   // LLP64 platforms.
   QualType OffsetFlagsTy = CGM.getContext().LongTy;
   const TargetInfo &TI = CGM.getContext().getTargetInfo();
-  if (TI.getTriple().isOSCygMing() &&
+  if ((TI.getTriple().isOSCygMing() || TI.getTriple().isOSVali()) &&
       TI.getPointerWidth(LangAS::Default) > TI.getLongWidth())
     OffsetFlagsTy = CGM.getContext().LongLongTy;
   llvm::Type *OffsetFlagsLTy =

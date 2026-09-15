@@ -227,6 +227,9 @@ typedef __char32_t char32_t;
 // TODO(44575): Switch to C11 thread API when possible.
 #      undef _LIBCPP_HAS_THREAD_API_PTHREAD
 #      define _LIBCPP_HAS_THREAD_API_PTHREAD 1
+#    elif defined(VALI)
+#      undef _LIBCPP_HAS_THREAD_API_C11
+#      define _LIBCPP_HAS_THREAD_API_C11 1
 #    elif defined(_LIBCPP_WIN32API)
 #      undef _LIBCPP_HAS_THREAD_API_WIN32
 #      define _LIBCPP_HAS_THREAD_API_WIN32 1

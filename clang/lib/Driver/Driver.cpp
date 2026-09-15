@@ -15,6 +15,7 @@
 #include "ToolChains/CSKYToolChain.h"
 #include "ToolChains/Clang.h"
 #include "ToolChains/CrossWindows.h"
+#include "ToolChains/Vali.h"
 #include "ToolChains/Cuda.h"
 #include "ToolChains/Cygwin.h"
 #include "ToolChains/Darwin.h"
@@ -6389,7 +6390,7 @@ InputInfoList Driver::BuildJobsForActionNoCache(
 
 const char *Driver::getDefaultImageName() const {
   llvm::Triple Target(llvm::Triple::normalize(TargetTriple));
-  return Target.isOSWindows() ? "a.exe" : "a.out";
+  return Target.isOSWindows() ? "a.exe" : Target.isOSVali() ? "a.run" : "a.out";
 }
 
 /// Create output filename based on ArgValue, which could either be a
@@ -7106,6 +7107,9 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
     switch (Target.getOS()) {
     case llvm::Triple::AIX:
       TC = std::make_unique<toolchains::AIX>(*this, Target, Args);
+      break;
+    case llvm::Triple::Vali:
+      TC = std::make_unique<toolchains::ValiToolChain>(*this, Target, Args);
       break;
     case llvm::Triple::Haiku:
       TC = std::make_unique<toolchains::Haiku>(*this, Target, Args);

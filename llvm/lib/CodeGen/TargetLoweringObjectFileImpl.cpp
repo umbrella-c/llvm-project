@@ -2019,7 +2019,8 @@ void TargetLoweringObjectFileCOFF::Initialize(MCContext &Ctx,
   TargetLoweringObjectFile::Initialize(Ctx, TM);
   this->TM = &TM;
   const Triple &T = TM.getTargetTriple();
-  if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment()) {
+  if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment() ||
+      T.isOSBinFormatVPE()) {
     StaticCtorSection =
         Ctx.getCOFFSection(".CRT$XCU", COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
                                            COFF::IMAGE_SCN_MEM_READ);
@@ -2041,6 +2042,18 @@ static MCSectionCOFF *getCOFFStaticStructorSection(MCContext &Ctx,
                                                    unsigned Priority,
                                                    const MCSymbol *KeySym,
                                                    MCSectionCOFF *Default) {
+  if (T.isOSBinFormatVPE()) {
+    if (Priority == 65535)
+      return Ctx.getAssociativeCOFFSection(Default, KeySym, 0);
+    // Preserve Vali's historical ordering, including priorities 200 and 400.
+    SmallString<24> Name;
+    raw_svector_ostream(Name) << ".CRT$X" << (IsCtor ? "C" : "T")
+                            << (Priority < 200 ? 'A' : 'T')
+                            << format("%05u", Priority);
+    auto *Sec = Ctx.getCOFFSection(
+        Name, COFF::IMAGE_SCN_CNT_INITIALIZED_DATA | COFF::IMAGE_SCN_MEM_READ);
+    return Ctx.getAssociativeCOFFSection(Sec, KeySym, 0);
+  }
   if (T.isWindowsMSVCEnvironment() || T.isWindowsItaniumEnvironment()) {
     // If the priority is the default, use .CRT$XCU, possibly associative.
     if (Priority == 65535)

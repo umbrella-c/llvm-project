@@ -23,7 +23,7 @@
 #  define _LIBCXXABI_COMPILER_GCC
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) || (defined(VALI) && !defined(__ELF__))
  #if defined(_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS) || (defined(__MINGW32__) && !defined(_LIBCXXABI_BUILDING_LIBRARY))
   #define _LIBCXXABI_HIDDEN
   #define _LIBCXXABI_DATA_VIS

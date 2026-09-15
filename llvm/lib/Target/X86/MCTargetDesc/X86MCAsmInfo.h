@@ -22,6 +22,12 @@
 namespace llvm {
 class Triple;
 
+// Vali shares COFF assembly syntax and COMDATs, but uses DWARF unwinding.
+class X86VPEMCAsmInfo : public MCAsmInfoCOFF {
+public:
+  X86VPEMCAsmInfo(const Triple &Triple, const MCTargetOptions &Options);
+};
+
 class X86MCAsmInfoDarwin : public MCAsmInfoDarwin {
   virtual void anchor();
 

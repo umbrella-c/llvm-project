@@ -692,6 +692,10 @@ StringRef LinkerDriver::findFile(StringRef filename) {
       path = SmallString<128>{getFilename(path.str())};
       if (sys::fs::exists(path.str()))
         return saver().save(path.str());
+    } else if (ctx.config.vpe && path.str().ends_with_insensitive(".lib")) {
+      sys::path::replace_extension(path, ".dll.lib");
+      if (sys::fs::exists(path.str()))
+        return saver().save(path.str());
     }
   }
   return filename;
@@ -732,6 +736,16 @@ StringRef LinkerDriver::findLibMinGW(StringRef filename) {
   return findFile(libName);
 }
 
+// Vali import libraries use the .dll.lib suffix.
+StringRef LinkerDriver::findLibVPE(StringRef filename) {
+  if (filename.contains('/') || filename.contains('\\'))
+    return filename;
+
+  SmallString<128> path = filename;
+  sys::path::replace_extension(path, ".dll.lib");
+  return findFile(saver().save(path.str()));
+}
+
 // Find library file from search path.
 StringRef LinkerDriver::findLib(StringRef filename) {
   // Add ".lib" to Filename if that has no file extension.
@@ -743,6 +757,8 @@ StringRef LinkerDriver::findLib(StringRef filename) {
   // looking for a MinGW formatted library name.
   if (ctx.config.mingw && ret == filename)
     return findLibMinGW(filename);
+  if (ctx.config.vpe && ret == filename)
+    return findLibVPE(filename);
   return ret;
 }
 
@@ -1688,9 +1704,10 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
     return;
   }
 
-  // Handle /lldmingw early, since it can potentially affect how other
+  // Handle /lldmingw and /lldvpe early, since they can affect how other
   // options are handled.
   config->mingw = args.hasArg(OPT_lldmingw);
+  config->vpe = args.hasArg(OPT_lldvpe);
   if (config->mingw)
     ctx.e.errorLimitExceededMsg = "too many errors emitted, stopping now"
                                   " (use --error-limit=0 to see all errors)";
@@ -2285,13 +2302,16 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
   config->terminalServerAware =
       !config->dll && args.hasFlag(OPT_tsaware, OPT_tsaware_no, true);
   config->autoImport =
-      args.hasFlag(OPT_auto_import, OPT_auto_import_no, config->mingw);
+      args.hasFlag(OPT_auto_import, OPT_auto_import_no,
+                   config->mingw || config->vpe);
   config->pseudoRelocs = args.hasFlag(
-      OPT_runtime_pseudo_reloc, OPT_runtime_pseudo_reloc_no, config->mingw);
+      OPT_runtime_pseudo_reloc, OPT_runtime_pseudo_reloc_no,
+      config->mingw || config->vpe);
   config->callGraphProfileSort = args.hasFlag(
       OPT_call_graph_profile_sort, OPT_call_graph_profile_sort_no, true);
   config->stdcallFixup =
-      args.hasFlag(OPT_stdcall_fixup, OPT_stdcall_fixup_no, config->mingw);
+      args.hasFlag(OPT_stdcall_fixup, OPT_stdcall_fixup_no,
+                   config->mingw || config->vpe);
   config->warnStdcallFixup = !args.hasArg(OPT_stdcall_fixup);
   config->allowDuplicateWeak =
       args.hasFlag(OPT_lld_allow_duplicate_weak,
@@ -2423,8 +2443,8 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
   if (args.hasArg(OPT_release))
     config->writeCheckSum = true;
 
-  // Handle /safeseh, x86 only, on by default, except for mingw.
-  if (config->machine == I386) {
+  // Vali uses DWARF unwinding, so SafeSEH does not apply.
+  if (config->machine == I386 && !config->vpe) {
     config->safeSEH = args.hasFlag(OPT_safeseh, OPT_safeseh_no, !config->mingw);
     config->noSEH = args.hasArg(OPT_noseh);
   }
@@ -2533,12 +2553,18 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
       symtab.entry = symtab.addGCRoot(symtab.mangle(arg->getValue()), true);
     } else if (!symtab.entry && !config->noEntry) {
       if (args.hasArg(OPT_dll)) {
-        StringRef s = DllDefaultEntryPoint(config->machine, config->mingw);
+        StringRef s = config->vpe
+                          ? symtab.mangle("__CrtLibraryEntry")
+                          : DllDefaultEntryPoint(config->machine, config->mingw);
         symtab.entry = symtab.addGCRoot(s, true);
       } else if (config->driverWdm) {
         // /driver:wdm implies /entry:_NtProcessStartup
         symtab.entry =
             symtab.addGCRoot(symtab.mangle("_NtProcessStartup"), true);
+      } else if (config->vpe) {
+        StringRef s = symtab.mangle("__CrtConsoleEntry");
+        symtab.entry = symtab.addGCRoot(s, true);
+        Log(ctx) << "Entry name inferred: " << s;
       } else {
         // Windows specific -- If entry point name is not given, we need to
         // infer that from user-defined entry name.
@@ -2634,7 +2660,7 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
 
   ctx.forEachSymtab([&](SymbolTable &symtab) {
     symtab.addSynthetic(symtab.mangle("__ImageBase"), nullptr);
-    if (symtab.machine == I386) {
+    if (symtab.machine == I386 && !config->vpe) {
       symtab.addAbsolute("___safe_se_handler_table", 0);
       symtab.addAbsolute("___safe_se_handler_count", 0);
     }

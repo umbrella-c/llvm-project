@@ -3655,3 +3655,37 @@ CodeGen::createWinX86_64TargetCodeGenInfo(CodeGenModule &CGM,
                                           X86AVXABILevel AVXLevel) {
   return std::make_unique<WinX86_64TargetCodeGenInfo>(CGM.getTypes(), AVXLevel);
 }
+
+namespace {
+// Vali shares the x86 calling and stack-probe ABIs, but retains the generic
+// library-option policy and does not emit Windows mismatch directives.
+template <class Base> class ValiX86TargetCodeGenInfo : public Base {
+public:
+  using Base::Base;
+
+  void getDependentLibraryOption(StringRef Lib,
+                                 llvm::SmallString<24> &Opt) const override {
+    TargetCodeGenInfo::getDependentLibraryOption(Lib, Opt);
+  }
+
+  void getDetectMismatchOption(StringRef Name, StringRef Value,
+                               llvm::SmallString<32> &Opt) const override {}
+};
+} // namespace
+
+std::unique_ptr<TargetCodeGenInfo>
+CodeGen::createValiX86_32TargetCodeGenInfo(CodeGenModule &CGM,
+                                        unsigned NumRegisterParameters) {
+  bool RetSmallStructInRegABI = X86_32TargetCodeGenInfo::isStructReturnInRegABI(
+      CGM.getTriple(), CGM.getCodeGenOpts());
+  return std::make_unique<ValiX86TargetCodeGenInfo<WinX86_32TargetCodeGenInfo>>(
+      CGM.getTypes(), /*DarwinVectorABI=*/false, RetSmallStructInRegABI,
+      /*Win32StructABI=*/true, NumRegisterParameters);
+}
+
+std::unique_ptr<TargetCodeGenInfo>
+CodeGen::createValiX86_64TargetCodeGenInfo(CodeGenModule &CGM,
+                                        X86AVXABILevel AVXLevel) {
+  return std::make_unique<ValiX86TargetCodeGenInfo<WinX86_64TargetCodeGenInfo>>(
+      CGM.getTypes(), AVXLevel);
+}

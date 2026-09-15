@@ -29,6 +29,7 @@
 #define TRIPLE_OS_ALIAS(Enum, AliasName)
 #endif
 
+TRIPLE_OS(Vali, "vali")
 TRIPLE_OS(Darwin, "darwin")
 TRIPLE_OS(DragonFly, "dragonfly")
 TRIPLE_OS(FreeBSD, "freebsd")
@@ -178,6 +179,8 @@ TRIPLE_ENV(MTIA, "mtia")
 #endif
 
 TRIPLE_VENDOR(AMD, "amd")
+TRIPLE_VENDOR(Umbrella, "umbrella")
+TRIPLE_VENDOR_ALIAS(Umbrella, "uml")
 TRIPLE_VENDOR(Apple, "apple")
 TRIPLE_VENDOR(CSR, "csr")
 TRIPLE_VENDOR(Freescale, "fsl")

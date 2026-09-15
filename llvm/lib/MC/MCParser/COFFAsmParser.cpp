@@ -61,7 +61,8 @@ class COFFAsmParser : public MCAsmParserExtension {
     addDirectiveHandler<&COFFAsmParser::parseDirectiveEndef>(".endef");
     addDirectiveHandler<&COFFAsmParser::parseDirectiveSecRel32>(".secrel32");
     addDirectiveHandler<&COFFAsmParser::parseDirectiveSymIdx>(".symidx");
-    addDirectiveHandler<&COFFAsmParser::parseDirectiveSafeSEH>(".safeseh");
+    if (!getContext().getTargetTriple().isOSBinFormatVPE())
+      addDirectiveHandler<&COFFAsmParser::parseDirectiveSafeSEH>(".safeseh");
     addDirectiveHandler<&COFFAsmParser::parseDirectiveSecIdx>(".secidx");
     addDirectiveHandler<&COFFAsmParser::parseDirectiveLinkOnce>(".linkonce");
     addDirectiveHandler<&COFFAsmParser::parseDirectiveRVA>(".rva");
@@ -71,6 +72,10 @@ class COFFAsmParser : public MCAsmParserExtension {
     addDirectiveHandler<&COFFAsmParser::parseDirectiveCGProfile>(".cg_profile");
     addDirectiveHandler<&COFFAsmParser::parseDirectiveSecNum>(".secnum");
     addDirectiveHandler<&COFFAsmParser::parseDirectiveSecOffset>(".secoffset");
+
+    // Vali uses DWARF CFI rather than Windows exception tables.
+    if (getContext().getTargetTriple().isOSBinFormatVPE())
+      return;
 
     // Win64 EH directives.
     addDirectiveHandler<&COFFAsmParser::parseSEHDirectiveStartProc>(

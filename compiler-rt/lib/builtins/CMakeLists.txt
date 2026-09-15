@@ -365,7 +365,7 @@ if (NOT MSVC)
     x86_64/floatdidf.c
     x86_64/floatdisf.c
   )
-  if (NOT WIN32)
+  if (NOT WIN32 AND NOT VALI)
     set(x86_64_SOURCES
       ${x86_64_SOURCES}
       x86_64/floatundidf.S
@@ -373,7 +373,7 @@ if (NOT MSVC)
     )
   endif()
 
-  if(NOT ANDROID AND (NOT WIN32 OR MINGW))
+  if(NOT ANDROID AND NOT VALI AND (NOT WIN32 OR MINGW))
     set(x86_64_SOURCES
       ${x86_64_SOURCES}
       ${x86_80_BIT_SOURCES}
@@ -393,7 +393,7 @@ if (NOT MSVC)
   # Darwin x86_64 Haswell
   set(x86_64h_SOURCES ${x86_64_SOURCES})
 
-  if (WIN32)
+  if (WIN32 OR VALI)
     set(x86_64_SOURCES
       ${x86_64_SOURCES}
       x86_64/chkstk.S
@@ -431,6 +431,9 @@ if (NOT MSVC)
       i386/chkstk.S
       i386/chkstk2.S
     )
+  elseif(VALI)
+    # Vali's probe adjusts ESP and uses the MSVC-style __chkstk spelling.
+    list(APPEND i386_SOURCES i386/chkstk2.S)
   endif()
 
   if(NOT ANDROID AND NOT (WIN32 AND NOT MINGW))

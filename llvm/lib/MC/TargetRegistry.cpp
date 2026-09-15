@@ -41,6 +41,11 @@ MCStreamer *Target::createMCObjectStreamer(
   switch (T.getObjectFormat()) {
   case Triple::UnknownObjectFormat:
     llvm_unreachable("Unknown object format");
+  case Triple::VPE:
+    // MCContext has already checked that this target supports VPE emission.
+    S = COFFStreamerCtorFn(Ctx, std::move(TAB), std::move(OW),
+                           std::move(Emitter));
+    break;
   case Triple::COFF:
     assert(T.isOSWindowsOrUEFI() && "only Windows and UEFI COFF are supported");
     S = COFFStreamerCtorFn(Ctx, std::move(TAB), std::move(OW),

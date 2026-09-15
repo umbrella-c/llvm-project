@@ -47,7 +47,7 @@
 // Visibility attributes
 // ---------------------
 
-#if defined(_LIBCPP_OBJECT_FORMAT_COFF)
+#if defined(_LIBCPP_OBJECT_FORMAT_COFF) || defined(_LIBCPP_OBJECT_FORMAT_VPE)
 
 #  ifdef _DLL
 #    define _LIBCPP_CRT_FUNC __declspec(dllimport)
@@ -108,7 +108,7 @@
 #    define _LIBCPP_NAMESPACE_VISIBILITY
 #  endif
 
-#endif // defined(_LIBCPP_OBJECT_FORMAT_COFF)
+#endif // COFF or VPE
 
 // hide_from_abi
 // -------------

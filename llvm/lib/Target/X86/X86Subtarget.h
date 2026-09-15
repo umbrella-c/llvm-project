@@ -298,6 +298,11 @@ public:
 
   bool isTargetELF() const { return TargetTriple.isOSBinFormatELF(); }
   bool isTargetCOFF() const { return TargetTriple.isOSBinFormatCOFF(); }
+  bool isTargetVPE() const { return TargetTriple.isOSBinFormatVPE(); }
+  bool isOSVali() const { return TargetTriple.isOSVali(); }
+  bool isTargetVali64() const { return Is64Bit && isOSVali(); }
+  // Calling-convention selection only; this does not enable Windows unwinding.
+  bool isTargetWin64ABI() const { return isTargetWin64() || isTargetVali64(); }
   bool isTargetMachO() const { return TargetTriple.isOSBinFormatMachO(); }
 
   bool isTargetLinux() const { return TargetTriple.isOSLinux(); }
@@ -360,7 +365,7 @@ public:
     case CallingConv::C:
     case CallingConv::Fast:
     case CallingConv::Tail:
-      return isTargetWin64() || isTargetUEFI64();
+      return isTargetWin64ABI() || isTargetUEFI64();
     case CallingConv::Swift:
     case CallingConv::SwiftTail:
     case CallingConv::X86_FastCall:
@@ -368,7 +373,7 @@ public:
     case CallingConv::X86_ThisCall:
     case CallingConv::X86_VectorCall:
     case CallingConv::Intel_OCL_BI:
-      return isTargetWin64();
+      return isTargetWin64ABI();
     // This convention allows using the Win64 convention on other targets.
     case CallingConv::Win64:
       return true;

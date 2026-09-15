@@ -17,6 +17,59 @@ using namespace llvm;
 
 namespace {
 
+TEST(TripleTest, ValiTargets) {
+  struct TargetCase {
+    const char *Name;
+    Triple::ArchType Arch;
+    Triple::ObjectFormatType Format;
+  };
+  const TargetCase Cases[] = {
+      {"i386", Triple::x86, Triple::VPE},
+      {"x86_64", Triple::x86_64, Triple::VPE},
+      {"armv7", Triple::arm, Triple::VPE},
+      {"thumbv7", Triple::thumb, Triple::VPE},
+      {"armebv7", Triple::armeb, Triple::ELF},
+      {"thumbebv7", Triple::thumbeb, Triple::ELF},
+      {"aarch64", Triple::aarch64, Triple::VPE},
+      {"aarch64_be", Triple::aarch64_be, Triple::ELF},
+      {"mips", Triple::mips, Triple::ELF},
+      {"mipsel", Triple::mipsel, Triple::ELF},
+      {"mips64", Triple::mips64, Triple::ELF},
+      {"mips64el", Triple::mips64el, Triple::ELF},
+  };
+  for (const auto &C : Cases) {
+    for (const char *Vendor : {"uml", "umbrella"}) {
+      Triple T(std::string(C.Name) + "-" + Vendor + "-vali");
+      SCOPED_TRACE(T.str());
+      EXPECT_EQ(C.Arch, T.getArch());
+      EXPECT_EQ(Triple::Umbrella, T.getVendor());
+      EXPECT_TRUE(T.isOSVali());
+      EXPECT_FALSE(T.isOSWindows());
+      EXPECT_TRUE(T.hasDLLImportExport());
+      EXPECT_EQ(C.Format, T.getObjectFormat());
+      EXPECT_EQ(C.Format == Triple::VPE, T.isOSBinFormatVPE());
+      Triple RoundTrip(T.getArch(), T.getSubArch(), T.getVendor(), T.getOS(),
+                       T.getEnvironment());
+      EXPECT_EQ(T.getVendor(), RoundTrip.getVendor());
+      EXPECT_EQ(T.getObjectFormat(), RoundTrip.getObjectFormat());
+    }
+  }
+  EXPECT_EQ("umbrella", Triple::getVendorTypeName(Triple::Umbrella));
+  EXPECT_EQ("vali", Triple::getOSTypeName(Triple::Vali));
+  EXPECT_EQ("vpe", Triple::getObjectFormatTypeName(Triple::VPE));
+  EXPECT_EQ(Triple::ELF, Triple("x86_64-uml-vali-elf").getObjectFormat());
+  EXPECT_EQ(Triple::VPE, Triple("mips-uml-vali-vpe").getObjectFormat());
+  EXPECT_EQ(Triple::COFF, Triple("x86_64-pc-windows").getObjectFormat());
+  EXPECT_EQ(Triple::ELF, Triple("x86_64-unknown-linux").getObjectFormat());
+}
+
+TEST(DataLayoutTest, Vali) {
+  EXPECT_EQ("e-m:x-p:32:32-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:32-n8:16:32-a:0:32-S32",
+            Triple("i386-uml-vali").computeDataLayout());
+  EXPECT_EQ("e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+            Triple("x86_64-uml-vali").computeDataLayout());
+}
+
 TEST(TripleTest, BasicParsing) {
   Triple T;
 

@@ -266,6 +266,8 @@ createTargetCodeGenInfo(CodeGenModule &CGM) {
           CGM, IsDarwinVectorABI, IsWin32FloatStructABI,
           CodeGenOpts.NumRegisterParameters);
     }
+    if (Triple.isOSVali())
+      return createValiX86_32TargetCodeGenInfo(CGM, CodeGenOpts.NumRegisterParameters);
     return createX86_32TargetCodeGenInfo(
         CGM, IsDarwinVectorABI, IsWin32FloatStructABI,
         CodeGenOpts.NumRegisterParameters, CodeGenOpts.FloatABI == "soft");
@@ -278,6 +280,8 @@ createTargetCodeGenInfo(CodeGenModule &CGM) {
                                                : X86AVXABILevel::None);
 
     switch (Triple.getOS()) {
+    case llvm::Triple::Vali:
+      return createValiX86_64TargetCodeGenInfo(CGM, AVXLevel);
     case llvm::Triple::UEFI:
     case llvm::Triple::Win32:
       return createWinX86_64TargetCodeGenInfo(CGM, AVXLevel);
@@ -352,7 +356,7 @@ bool CodeGenModule::shouldUseLLVMABILowering(unsigned CallingConv) const {
     return true;
 
   if (T.getArch() == llvm::Triple::x86_64 && !T.isOSWindows() && !T.isUEFI() &&
-      !T.isOSDarwin() && !T.isOSCygMing()) {
+      !T.isOSDarwin() && !T.isOSCygMing() && !T.isOSVali()) {
     switch (CallingConv) {
     case llvm::CallingConv::Win64:
     case llvm::CallingConv::X86_RegCall:
@@ -2192,8 +2196,8 @@ static bool shouldAssumeDSOLocal(const CodeGenModule &CGM,
 
   const llvm::Triple &TT = CGM.getTriple();
   const auto &CGOpts = CGM.getCodeGenOpts();
-  if (TT.isOSCygMing()) {
-    // In MinGW, variables without DLLImport can still be automatically
+  if (TT.isOSCygMing() || TT.isOSVali()) {
+    // In MinGW and Vali, variables without DLLImport can still be automatically
     // imported from a DLL by the linker; don't mark variables that
     // potentially could come from another DLL as DSO local.
 
@@ -2210,7 +2214,8 @@ static bool shouldAssumeDSOLocal(const CodeGenModule &CGM,
   // On COFF, don't mark 'extern_weak' symbols as DSO local. If these symbols
   // remain unresolved in the link, they can be resolved to zero, which is
   // outside the current DSO.
-  if (TT.isOSBinFormatCOFF() && GV->hasExternalWeakLinkage())
+  if ((TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE()) &&
+      GV->hasExternalWeakLinkage())
     return false;
 
   // Every other GV is local on COFF.
@@ -2218,7 +2223,8 @@ static bool shouldAssumeDSOLocal(const CodeGenModule &CGM,
   // *-win32-macho triples. This (accidentally?) produced windows relocations
   // without GOT tables in older clang versions; Keep this behaviour.
   // FIXME: even thread local variables?
-  if (TT.isOSBinFormatCOFF() || (TT.isOSWindows() && TT.isOSBinFormatMachO()))
+  if (TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE() ||
+      (TT.isOSWindows() && TT.isOSBinFormatMachO()))
     return true;
 
   // Only handle COFF and ELF for now.

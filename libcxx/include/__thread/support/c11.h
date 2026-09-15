@@ -29,9 +29,13 @@ using __libcpp_timespec_t = ::timespec;
 // Mutex
 //
 typedef mtx_t __libcpp_mutex_t;
+#if defined(VALI)
+#define _LIBCPP_MUTEX_INITIALIZER MUTEX_INIT(mtx_plain)
+#else
 // mtx_t is a struct so using {} for initialization is valid.
 #define _LIBCPP_MUTEX_INITIALIZER                                                                                      \
   {}
+#endif
 
 typedef mtx_t __libcpp_recursive_mutex_t;
 
@@ -80,9 +84,13 @@ inline _LIBCPP_HIDE_FROM_ABI int __libcpp_mutex_destroy(__libcpp_mutex_t* __m) {
 // Condition Variable
 //
 typedef cnd_t __libcpp_condvar_t;
+#if defined(VALI)
+#define _LIBCPP_CONDVAR_INITIALIZER COND_INIT
+#else
 // cnd_t is a struct so using {} for initialization is valid.
 #define _LIBCPP_CONDVAR_INITIALIZER                                                                                    \
   {}
+#endif
 
 inline _LIBCPP_HIDE_FROM_ABI int __libcpp_condvar_signal(__libcpp_condvar_t* __cv) {
   return cnd_signal(__cv) == thrd_success ? 0 : EINVAL;
@@ -100,7 +108,11 @@ __libcpp_condvar_wait(__libcpp_condvar_t* __cv, __libcpp_mutex_t* __m) {
 _LIBCPP_NO_THREAD_SAFETY_ANALYSIS inline _LIBCPP_HIDE_FROM_ABI int
 __libcpp_condvar_timedwait(__libcpp_condvar_t* __cv, __libcpp_mutex_t* __m, timespec* __ts) {
   int __ec = cnd_timedwait(__cv, __m, __ts);
+#if defined(VALI)
+  return __ec == thrd_success ? 0 : (__ec == thrd_timedout ? ETIMEDOUT : EINVAL);
+#else
   return __ec == thrd_timedout ? ETIMEDOUT : __ec;
+#endif
 }
 
 inline _LIBCPP_HIDE_FROM_ABI int __libcpp_condvar_destroy(__libcpp_condvar_t* __cv) {
@@ -149,7 +161,11 @@ inline _LIBCPP_HIDE_FROM_ABI bool __libcpp_thread_isnull(const __libcpp_thread_t
 
 inline _LIBCPP_HIDE_FROM_ABI int __libcpp_thread_create(__libcpp_thread_t* __t, void* (*__func)(void*), void* __arg) {
   int __ec = thrd_create(__t, reinterpret_cast<thrd_start_t>(__func), __arg);
+#if defined(VALI)
+  return __ec == thrd_success ? 0 : (__ec == thrd_nomem ? ENOMEM : EINVAL);
+#else
   return __ec == thrd_nomem ? ENOMEM : __ec;
+#endif
 }
 
 inline _LIBCPP_HIDE_FROM_ABI __libcpp_thread_id __libcpp_thread_get_current_id() { return thrd_current(); }

@@ -264,6 +264,7 @@ def kill_at : F<"kill-at">;
 defm lld_allow_duplicate_weak : B_priv<"lld-allow-duplicate-weak">;
 def lldemit : P<"lldemit", "Specify output type">;
 def lldmingw : F<"lldmingw">;
+def lldvpe : F<"lldvpe">;
 def noseh : F<"noseh">;
 def osversion : P_priv<"osversion">;
 def output_def : Joined<["/", "-", "/?", "-?"], "output-def:">;

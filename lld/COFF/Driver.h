@@ -110,6 +110,7 @@ private:
   StringRef findFile(StringRef filename);
   StringRef findLib(StringRef filename);
   StringRef findLibMinGW(StringRef filename);
+  StringRef findLibVPE(StringRef filename);
 
   // Determines the location of the sysroot based on `args`, environment, etc.
   void detectWinSysRoot(const llvm::opt::InputArgList &args);

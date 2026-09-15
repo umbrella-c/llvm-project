@@ -200,7 +200,7 @@ bool TargetMachine::shouldAssumeDSOLocal(const GlobalValue *GV) const {
   if (GV->isDSOLocal())
     return true;
 
-  if (TT.isOSBinFormatCOFF()) {
+  if (TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE()) {
     // DLLImport explicitly marks the GV as external.
     if (GV->hasDLLImportStorageClass())
       return false;
@@ -210,7 +210,7 @@ bool TargetMachine::shouldAssumeDSOLocal(const GlobalValue *GV) const {
     // don't assume the variables to be DSO local unless we actually know
     // that for sure. This only has to be done for variables; for functions
     // the linker can insert thunks for calling functions from another DLL.
-    if (TT.isOSCygMing() && GV->isDeclarationForLinker() &&
+    if ((TT.isOSCygMing() || TT.isOSVali()) && GV->isDeclarationForLinker() &&
         isa<GlobalVariable>(GV))
       return false;
 

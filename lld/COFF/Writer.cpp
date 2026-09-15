@@ -2016,6 +2016,17 @@ template <typename PEHeaderTy> void Writer::writeHeader() {
                                 : sizeof(object::coff_tls_directory32);
     }
   }
+  // Vali's loader applies pseudo relocations using the GLOBAL_PTR directory.
+  if (config->vpe) {
+    auto *begin = dyn_cast_or_null<Defined>(
+        symtab.findUnderscore("__RUNTIME_PSEUDO_RELOC_LIST__"));
+    auto *end = dyn_cast_or_null<Defined>(
+        symtab.findUnderscore("__RUNTIME_PSEUDO_RELOC_LIST_END__"));
+    if (begin && end) {
+      dir[GLOBAL_PTR].RelativeVirtualAddress = begin->getRVA();
+      dir[GLOBAL_PTR].Size = end->getRVA() - begin->getRVA();
+    }
+  }
   if (debugDirectory) {
     dir[DEBUG_DIRECTORY].RelativeVirtualAddress = debugDirectory->getRVA();
     dir[DEBUG_DIRECTORY].Size = debugDirectory->getSize();
@@ -2446,7 +2457,8 @@ void Writer::createRuntimePseudoRelocs() {
                << " runtime pseudo relocations";
       const char *symbolName = "_pei386_runtime_relocator";
       Symbol *relocator = symtab.findUnderscore(symbolName);
-      if (!relocator)
+      // Vali applies the list in processd, before entering the image.
+      if (!relocator && !ctx.config.vpe)
         Err(ctx)
             << "output image has runtime pseudo relocations, but the function "
             << symbolName

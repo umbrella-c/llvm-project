@@ -126,7 +126,7 @@ static bool useFramePointerForTargetByDefault(const llvm::opt::ArgList &Args,
     break;
   }
 
-  if (Triple.isOSFuchsia() || Triple.isOSNetBSD()) {
+  if (Triple.isOSFuchsia() || Triple.isOSNetBSD() || Triple.isOSVali()) {
     return !clang::driver::tools::areOptimizationsEnabled(Args);
   }
 

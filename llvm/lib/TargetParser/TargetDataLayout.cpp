@@ -18,7 +18,8 @@ static StringRef getManglingComponent(const Triple &T) {
     return "-m:l";
   if (T.isOSBinFormatMachO())
     return "-m:o";
-  if (T.isOSWindowsOrUEFI() && T.isOSBinFormatCOFF())
+  if (T.isOSBinFormatVPE() ||
+      (T.isOSWindowsOrUEFI() && T.isOSBinFormatCOFF()))
     return T.getArch() == Triple::x86 ? "-m:x" : "-m:w";
   if (T.isOSBinFormatXCOFF())
     return "-m:a";
@@ -406,6 +407,15 @@ static std::string computeSystemZDataLayout(const Triple &TT) {
 }
 
 static std::string computeX86DataLayout(const Triple &TT) {
+  // Preserve Vali's established x86 ABI, including its 32-bit stack alignment.
+  if (TT.isOSVali()) {
+    if (TT.isX86_64())
+      return "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-"
+             "n8:16:32:64-S128";
+    return "e-m:x-p:32:32-p270:32:32-p271:32:32-p272:64:64-i64:64-"
+           "f80:32-n8:16:32-a:0:32-S32";
+  }
+
   bool Is64Bit = TT.isX86_64();
 
   // X86 is little endian

@@ -686,7 +686,7 @@ void X86FrameLowering::emitStackProbe(
 }
 
 bool X86FrameLowering::stackProbeFunctionModifiesSP() const {
-  return STI.isOSWindows() && !STI.isTargetWin64();
+  return (STI.isOSWindows() || STI.isOSVali()) && !STI.is64Bit();
 }
 
 void X86FrameLowering::inlineStackProbe(MachineFunction &MF,
@@ -1263,10 +1263,10 @@ void X86FrameLowering::emitStackProbeCall(
       .addReg(X86::EFLAGS, RegState::Define | RegState::Implicit);
 
   MachineInstr *ModInst = CI;
-  if (STI.isTargetWin64() || !STI.isOSWindows()) {
-    // MSVC x32's _chkstk and cygwin/mingw's _alloca adjust %esp themselves.
-    // MSVC x64's __chkstk and cygwin/mingw's ___chkstk_ms do not adjust %rsp
-    // themselves. They also does not clobber %rax so we can reuse it when
+  if (!stackProbeFunctionModifiesSP()) {
+    // MSVC/Vali x32's _chkstk and cygwin/mingw's _alloca adjust %esp themselves.
+    // MSVC/Vali x64's __chkstk and cygwin/mingw's ___chkstk_ms leave %rsp
+    // unchanged. They also preserve %rax so we can reuse it when
     // adjusting %rsp.
     // All other platforms do not specify a particular ABI for the stack probe
     // function, so we arbitrarily define it to not adjust %esp/%rsp itself.
@@ -1280,7 +1280,7 @@ void X86FrameLowering::emitStackProbeCall(
   // allocation (i.e., DYN_ALLOC_*), substitute it for the instruction that
   // modifies SP.
   if (InstrNum) {
-    if (STI.isTargetWin64() || !STI.isOSWindows()) {
+    if (!stackProbeFunctionModifiesSP()) {
       // Label destination operand of the subtract.
       MF.makeDebugValueSubstitution(*InstrNum,
                                     {ModInst->getDebugInstrNum(), 0});

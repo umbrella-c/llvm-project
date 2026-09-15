@@ -293,7 +293,8 @@ public:
     OpenEmbedded,
     Intel,
     Meta,
-    LastVendorType = Meta
+    Umbrella,
+    LastVendorType = Umbrella
   };
   enum OSType {
     UnknownOS,
@@ -347,7 +348,8 @@ public:
     Firmware,
     QURT,
     H2,
-    LastOSType = H2
+    Vali,
+    LastOSType = Vali
   };
   enum EnvironmentType {
     UnknownEnvironment,
@@ -425,6 +427,7 @@ public:
     SPIRV,
     Wasm,
     XCOFF,
+    VPE,
   };
 
 private:
@@ -1285,7 +1288,13 @@ public:
   LLVM_ABI unsigned getDefaultWCharSize() const;
 
   /// Tests if the environment supports dllimport/export annotations.
-  bool hasDLLImportExport() const { return isOSWindows() || isPS(); }
+  bool isOSVali() const { return getOS() == Vali; }
+
+  bool isOSBinFormatVPE() const { return getObjectFormat() == VPE; }
+
+  bool hasDLLImportExport() const {
+    return isOSWindows() || isPS() || isOSVali();
+  }
 
   /// @}
   /// @name Mutators

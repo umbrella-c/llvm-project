@@ -3200,12 +3200,12 @@ def isCygwinMinGW64 : RuntimeLibcallPredicate<
 def isCygwinMinGW32 : RuntimeLibcallPredicate<
   [{TT.isOSCygMing() && TT.getArch() == Triple::x86}]>;
 
-def isWin32NotCygMing : RuntimeLibcallPredicate<
+def usesChkstk32 : RuntimeLibcallPredicate<
   [{TT.getArch() == Triple::x86 &&
-     TT.isOSWindowsOrUEFI() && !TT.isOSCygMing()}]>;
-def isWin64NotCygMing : RuntimeLibcallPredicate<
+     (TT.isOSVali() || (TT.isOSWindowsOrUEFI() && !TT.isOSCygMing()))}]>;
+def usesChkstk64 : RuntimeLibcallPredicate<
   [{TT.getArch() == Triple::x86_64 &&
-    TT.isOSWindowsOrUEFI() && !TT.isOSCygMing()}]>;
+    (TT.isOSVali() || (TT.isOSWindowsOrUEFI() && !TT.isOSCygMing()))}]>;
 
 
 // Some darwins have an optimized __bzero/bzero function.
@@ -3243,19 +3243,19 @@ defvar X86CommonLibcalls =
        DefaultSafeStackGlobals,
        LibcallImpls<(add MemChkLibcalls), isNotPS>,
        LibcallImpls<(add ___chkstk_ms), isCygwinMinGW64>,
-       LibcallImpls<(add __chkstk), isWin64NotCygMing>,
+       LibcallImpls<(add __chkstk), usesChkstk64>,
        LibcallImpls<(add _alloca), isCygwinMinGW32>,
-       LibcallImpls<(add _chkstk), isWin32NotCygMing>,
+       LibcallImpls<(add _chkstk), usesChkstk32>,
        LibcSafestackPointerAddress
 );
 
 defvar Windows32DivRemMulCalls =
   LibcallsWithCC<(add WindowsDivRemMulLibcalls), X86_STDCALL,
-  RuntimeLibcallPredicate<"TT.isWindowsMSVCEnvironment() || TT.isWindowsItaniumEnvironment()">>;
+  RuntimeLibcallPredicate<"TT.isWindowsMSVCEnvironment() || TT.isWindowsItaniumEnvironment() || TT.isOSVali()">>;
 
 defvar NotWindows32DivRemMulCalls =
   LibcallImpls<(add WindowsDivRemMulLibcallOverrides),
-    RuntimeLibcallPredicate<"!TT.isWindowsMSVCEnvironment() && !TT.isWindowsItaniumEnvironment()">>;
+    RuntimeLibcallPredicate<"!TT.isWindowsMSVCEnvironment() && !TT.isWindowsItaniumEnvironment() && !TT.isOSVali()">>;
 
 def X86_32SystemLibrary
     : SystemRuntimeLibrary<isX86_32,

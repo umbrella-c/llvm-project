@@ -2617,7 +2617,8 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
         continue;
       }
 
-      if (C.getDefaultToolChain().getTriple().isOSBinFormatCOFF() &&
+      if ((C.getDefaultToolChain().getTriple().isOSBinFormatCOFF() ||
+           C.getDefaultToolChain().getTriple().isOSBinFormatVPE()) &&
           Value == "-mbig-obj")
         continue; // LLVM handles bigobj automatically
 
@@ -7554,7 +7555,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   // -fms-extensions=0 is default.
   if (Args.hasFlag(options::OPT_fms_extensions, options::OPT_fno_ms_extensions,
-                   IsWindowsMSVC || IsUEFI))
+                   IsWindowsMSVC || IsUEFI || RawTriple.isOSVali()))
     CmdArgs.push_back("-fms-extensions");
 
   // -fms-compatibility=0 is default.
@@ -8499,7 +8500,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   if (Args.hasFlag(options::OPT_faddrsig, options::OPT_fno_addrsig,
                    (TC.getTriple().isOSBinFormatELF() ||
-                    TC.getTriple().isOSBinFormatCOFF()) &&
+                    TC.getTriple().isOSBinFormatCOFF() ||
+                    TC.getTriple().isOSBinFormatVPE()) &&
                        !TC.getTriple().isPS4() && !TC.getTriple().isVE() &&
                        !TC.getTriple().isOSNetBSD() &&
                        !Distro(D.getVFS(), TC.getTriple()).IsGentoo() &&

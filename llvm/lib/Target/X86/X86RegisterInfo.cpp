@@ -67,7 +67,7 @@ X86RegisterInfo::X86RegisterInfo(const Triple &TT)
   // Cache some information.
   Is64Bit = TT.isX86_64();
   IsTarget64BitLP64 = Is64Bit && !TT.isX32();
-  IsWin64 = Is64Bit && TT.isOSWindows();
+  IsWin64 = Is64Bit && (TT.isOSWindows() || TT.isOSVali());
   IsUEFI64 = Is64Bit && TT.isUEFI();
 
   // Use a callee-saved register as the base pointer.  These registers must

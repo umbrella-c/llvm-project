@@ -333,7 +333,7 @@ option(LIBCXX_ENABLE_PEDANTIC "Compile with pedantic enabled." OFF)
 option(LIBCXX_ENABLE_WERROR "Fail and stop if a warning is triggered." OFF)
 
 set(LIBCXX_HERMETIC_STATIC_LIBRARY_DEFAULT OFF)
-if (WIN32)
+if (WIN32 OR VALI)
   set(LIBCXX_HERMETIC_STATIC_LIBRARY_DEFAULT ON)
 endif()
 option(LIBCXX_HERMETIC_STATIC_LIBRARY
@@ -890,12 +890,12 @@ endif()
 # By default libc++ on Windows expects to use a shared library, which requires
 # the headers to use DLL import/export semantics. However when building a
 # static library only we modify the headers to disable DLL import/export.
-if (DEFINED WIN32 AND LIBCXX_ENABLE_STATIC AND NOT LIBCXX_ENABLE_SHARED)
+if ((WIN32 OR VALI) AND LIBCXX_ENABLE_STATIC AND NOT LIBCXX_ENABLE_SHARED)
   message(STATUS "Generating custom __config for non-DLL Windows build")
   config_define(ON _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS)
 endif()
 
-if (WIN32 AND LIBCXX_ENABLE_STATIC_ABI_LIBRARY)
+if ((WIN32 OR VALI) AND LIBCXX_ENABLE_STATIC_ABI_LIBRARY)
   # If linking libcxxabi statically into libcxx, skip the dllimport attributes
   # on symbols we refer to from libcxxabi.
   add_definitions(-D_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS)

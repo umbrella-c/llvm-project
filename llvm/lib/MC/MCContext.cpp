@@ -86,6 +86,14 @@ MCContext::MCContext(const Triple &TheTriple, const MCAsmInfo &mai,
   case Triple::MachO:
     Env = IsMachO;
     break;
+  case Triple::VPE:
+    // VPE uses the COFF object encoding, with Vali-specific ABI and unwind
+    // conventions selected using the target triple.
+    if (!TheTriple.isX86())
+      reportFatalUsageError(
+          "VPE object emission is currently supported only on x86");
+    Env = IsCOFF;
+    break;
   case Triple::COFF:
     if (!TheTriple.isOSWindowsOrUEFI()) {
       reportFatalUsageError(

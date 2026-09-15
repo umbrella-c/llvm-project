@@ -31,6 +31,8 @@
   #if defined(__aarch64__) || defined(__arm64__) || defined(__arm64e__)
     #define _LIBUNWIND_TRACE_RET_INJECT 1
   #endif
+#elif defined(__MOLLENOS__) || defined(__VALI__)
+  #define _LIBUNWIND_SUPPORT_DWARF_UNWIND 1
 #elif defined(_WIN32)
   #ifdef __SEH__
     #define _LIBUNWIND_SUPPORT_SEH_UNWIND 1
@@ -75,7 +77,10 @@
   #define _LIBUNWIND_EXPORT
   #define _LIBUNWIND_HIDDEN
 #else
-  #if !defined(__ELF__) && !defined(__MACH__) && !defined(_AIX)
+  #if defined(__MOLLENOS__) || defined(__VALI__)
+    #define _LIBUNWIND_EXPORT __declspec(dllexport)
+    #define _LIBUNWIND_HIDDEN
+  #elif !defined(__ELF__) && !defined(__MACH__) && !defined(_AIX)
     #define _LIBUNWIND_EXPORT __declspec(dllexport)
     #define _LIBUNWIND_HIDDEN
   #else
@@ -102,7 +107,7 @@
 #define _LIBUNWIND_WEAK_ALIAS(name, aliasname)                                 \
   extern "C" _LIBUNWIND_EXPORT __typeof(name) aliasname                        \
       __attribute__((weak, alias(#name)));
-#elif defined(_WIN32)
+#elif defined(_WIN32) || defined(__MOLLENOS__) || defined(__VALI__)
 #if defined(__MINGW32__)
 #define _LIBUNWIND_WEAK_ALIAS(name, aliasname)                                 \
   extern "C" _LIBUNWIND_EXPORT __typeof(name) aliasname                        \

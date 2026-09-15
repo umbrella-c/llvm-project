@@ -15,6 +15,8 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#elif defined(__MOLLENOS__) || defined(__VALI__)
+#include <threads.h>
 #elif !defined(_LIBUNWIND_HAS_NO_THREADS)
 #include <pthread.h>
 #if defined(__ELF__) && defined(_LIBUNWIND_LINK_PTHREAD_LIB)
@@ -25,6 +27,22 @@
 namespace libunwind {
 
 #if defined(_LIBUNWIND_HAS_NO_THREADS)
+
+class _LIBUNWIND_HIDDEN RWMutex {
+public:
+  RWMutex() { mtx_init(&_lock, mtx_plain); }
+  ~RWMutex() { mtx_destroy(&_lock); }
+
+  bool lock_shared() { return mtx_lock(&_lock) == thrd_success; }
+  bool unlock_shared() { return mtx_unlock(&_lock) == thrd_success; }
+  bool lock() { return mtx_lock(&_lock) == thrd_success; }
+  bool unlock() { return mtx_unlock(&_lock) == thrd_success; }
+
+private:
+  mtx_t _lock;
+};
+
+#elif defined(__MOLLENOS__) || defined(__VALI__)
 
 class _LIBUNWIND_HIDDEN RWMutex {
 public:

@@ -45,6 +45,7 @@ recipes:
         - -DLIBCXX_CXX_ABI='libcxxabi'
         - -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON
         - -DCMAKE_TOOLCHAIN_FILE=$[[ PROJECT_PATH ]]/chef/vali.cmake
+        - -DRUNTIMES_CMAKE_ARGS=-DCMAKE_TOOLCHAIN_FILE=$[[ PROJECT_PATH ]]/chef/vali.cmake
       env:
         VALICC: $[[ TOOLCHAIN_PREFIX ]]/usr/local
         VALI_ARCH: $[[ CHEF_TARGET_ARCHITECTURE ]]
@@ -57,7 +58,9 @@ recipes:
       arguments: [cxx, cxxabi, unwind, compiler-rt]
       env:
         VALICC: $[[ TOOLCHAIN_PREFIX ]]/usr/local
+        VALI_ARCH: $[[ CHEF_TARGET_ARCHITECTURE ]]
         VALI_SDK_PATH: $[[ BUILD_INGREDIENTS_PREFIX ]]
+        LIBCXX_BOOTSTRAP: true
   - name: llvm-projects
     path: llvm
     toolchain: platform

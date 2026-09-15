@@ -184,7 +184,7 @@
 #define NO_EXEC_STACK_DIRECTIVE
 #endif
 
-#elif defined(_WIN32)
+#elif defined(_WIN32) || defined(__MOLLENOS__) || defined(__VALI__)
 
 #define SYMBOL_IS_FUNC(name)                                                   \
   .def name SEPARATOR                                                          \

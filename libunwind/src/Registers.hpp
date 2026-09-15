@@ -350,12 +350,12 @@ private:
     uint64_t __cs;
     uint64_t __fs;
     uint64_t __gs;
-#if defined(_WIN64)
+#if defined(_WIN64) || defined(__MOLLENOS__) || defined(__VALI__)
     uint64_t __padding; // 16-byte align
 #endif
   };
   GPRs _registers;
-#if defined(_WIN64)
+#if defined(_WIN64) || defined(__MOLLENOS__) || defined(__VALI__)
   v128 _xmm[16];
 #endif
 };
@@ -571,7 +571,7 @@ inline void Registers_x86_64::setFloatRegister(int, double) {
 }
 
 inline bool Registers_x86_64::validVectorRegister(int regNum) const {
-#if defined(_WIN64)
+#if defined(_WIN64) || defined(__MOLLENOS__) || defined(__VALI__)
   if (regNum < UNW_X86_64_XMM0)
     return false;
   if (regNum > UNW_X86_64_XMM15)
@@ -584,7 +584,7 @@ inline bool Registers_x86_64::validVectorRegister(int regNum) const {
 }
 
 inline v128 Registers_x86_64::getVectorRegister(int regNum) const {
-#if defined(_WIN64)
+#if defined(_WIN64) || defined(__MOLLENOS__) || defined(__VALI__)
   assert(validVectorRegister(regNum));
   return _xmm[regNum - UNW_X86_64_XMM0];
 #else
@@ -594,7 +594,7 @@ inline v128 Registers_x86_64::getVectorRegister(int regNum) const {
 }
 
 inline void Registers_x86_64::setVectorRegister(int regNum, v128 value) {
-#if defined(_WIN64)
+#if defined(_WIN64) || defined(__MOLLENOS__) || defined(__VALI__)
   assert(validVectorRegister(regNum));
   _xmm[regNum - UNW_X86_64_XMM0] = value;
 #else

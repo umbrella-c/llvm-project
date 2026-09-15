@@ -121,7 +121,7 @@ DEFINE_LIBUNWIND_FUNCTION("#__unw_getcontext")
 #  thread_state pointer is in rdi
 #
 DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
-#if defined(_WIN64)
+#if defined(_WIN64) || defined(__MOLLENOS__) || defined(__VALI__)
 #define PTR %rcx
 #define TMP %rdx
 #else
@@ -154,7 +154,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   # skip fs
   # skip gs
 
-#if defined(_WIN64)
+#if defined(_WIN64) || defined(__MOLLENOS__) || defined(__VALI__)
   movdqu %xmm0,176(PTR)
   movdqu %xmm1,192(PTR)
   movdqu %xmm2,208(PTR)

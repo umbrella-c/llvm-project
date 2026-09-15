@@ -39,14 +39,14 @@
 # if defined(__HAIKU__)
 #  define _LIBUNWIND_TARGET_HAIKU 1
 # endif
-# if defined(__i386__)
+# if defined(__i386__) || defined(i386)
 #  define _LIBUNWIND_TARGET_I386
 #  define _LIBUNWIND_CONTEXT_SIZE 8
 #  define _LIBUNWIND_CURSOR_SIZE 15
 #  define _LIBUNWIND_HIGHEST_DWARF_REGISTER _LIBUNWIND_HIGHEST_DWARF_REGISTER_X86
-# elif defined(__x86_64__)
+# elif defined(__x86_64__) || defined(__amd64__) || defined(amd64)
 #  define _LIBUNWIND_TARGET_X86_64 1
-#  if defined(_WIN64)
+#  if defined(_WIN64) || defined(__MOLLENOS__) || defined(__VALI__)
 #    define _LIBUNWIND_CONTEXT_SIZE 54
 #    ifdef __SEH__
 #      define _LIBUNWIND_CURSOR_SIZE 204

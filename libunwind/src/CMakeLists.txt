@@ -18,6 +18,9 @@ set(LIBUNWIND_C_SOURCES
     Unwind-sjlj.c
     Unwind-wasm.c
     )
+if(MOLLENOS)
+  list(APPEND LIBUNWIND_C_SOURCES main.c)
+endif()
 set_source_files_properties(${LIBUNWIND_C_SOURCES}
                             PROPERTIES
                               # We need to set `-fexceptions` here so that key
@@ -31,6 +34,9 @@ set(LIBUNWIND_ASM_SOURCES
     UnwindRegistersRestore.S
     UnwindRegistersSave.S
     )
+if(MOLLENOS)
+  set_source_files_properties(${LIBUNWIND_ASM_SOURCES} PROPERTIES LANGUAGE C)
+endif()
 
 set(LIBUNWIND_HEADERS
     AddressSpace.hpp

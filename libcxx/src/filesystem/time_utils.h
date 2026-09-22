@@ -26,6 +26,11 @@
 #  define WIN32_LEAN_AND_MEAN
 #  define NOMINMAX
 #  include <windows.h>
+#elif defined(__VALI__)
+#  include <io.h>
+#  include <os/services/file.h>
+#  include <os/services/path.h>
+#  include <os/mollenos.h>
 #else
 #  include <fcntl.h>
 #  include <sys/stat.h>
@@ -97,6 +102,15 @@ inline FILETIME timespec_to_filetime(TimeSpec ts) {
   return ft;
 }
 
+#elif defined(__VALI__)
+using TimeSpec = struct timespec;
+struct StatT {
+  unsigned st_mode;
+  TimeSpec st_atim, st_mtim;
+  long st_dev, st_ino;
+  unsigned st_nlink;
+  uint64_t st_size;
+};
 #else
 using TimeSpec = struct timespec;
 using TimeVal  = struct timeval;
@@ -301,7 +315,12 @@ inline TimeSpec extract_atime(StatT const& st) { return st.st_atim; }
 
 #if _LIBCPP_HAS_FILESYSTEM
 
-#  if !defined(_LIBCPP_WIN32API)
+#  if defined(__VALI__)
+inline bool set_file_times(const path&, std::array<TimeSpec, 2> const&, error_code& ec) {
+  ec = make_error_code(errc::operation_not_supported);
+  return true;
+}
+#  elif !defined(_LIBCPP_WIN32API)
 inline bool posix_utimes(const path& p, std::array<TimeSpec, 2> const& TS, error_code& ec) {
   TimeVal ConvertedTS[2] = {make_timeval(TS[0]), make_timeval(TS[1])};
   if (::utimes(p.c_str(), ConvertedTS) == -1) {

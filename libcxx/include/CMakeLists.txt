@@ -554,6 +554,7 @@ set(files
   __locale_dir/support/no_locale/formatting.h
   __locale_dir/support/no_locale/strtonum.h
   __locale_dir/support/openbsd.h
+  __locale_dir/support/vali.h
   __locale_dir/support/windows.h
   __locale_dir/time.h
   __locale_dir/wbuffer_convert.h

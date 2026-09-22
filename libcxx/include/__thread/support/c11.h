@@ -16,6 +16,9 @@
 #include <ctime>
 #include <errno.h>
 #include <threads.h>
+#if defined(__VALI__)
+#  include <stdlib.h>
+#endif
 
 #ifndef _LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER
 #  pragma GCC system_header
@@ -107,7 +110,19 @@ __libcpp_condvar_wait(__libcpp_condvar_t* __cv, __libcpp_mutex_t* __m) {
 
 _LIBCPP_NO_THREAD_SAFETY_ANALYSIS inline _LIBCPP_HIDE_FROM_ABI int
 __libcpp_condvar_timedwait(__libcpp_condvar_t* __cv, __libcpp_mutex_t* __m, timespec* __ts) {
+#if defined(__VALI__)
+  // libc++ system_clock deadlines use 1970; Vali C11 deadlines use 2000.
+  timespec __vali_ts = *__ts;
+  if (__vali_ts.tv_sec < 946684800) {
+    __vali_ts.tv_sec = 0;
+    __vali_ts.tv_nsec = 0;
+  } else {
+    __vali_ts.tv_sec -= 946684800;
+  }
+  int __ec = cnd_timedwait(__cv, __m, &__vali_ts);
+#else
   int __ec = cnd_timedwait(__cv, __m, __ts);
+#endif
 #if defined(VALI)
   return __ec == thrd_success ? 0 : (__ec == thrd_timedout ? ETIMEDOUT : EINVAL);
 #else
@@ -159,8 +174,32 @@ inline _LIBCPP_HIDE_FROM_ABI bool __libcpp_thread_isnull(const __libcpp_thread_t
   return __libcpp_thread_get_id(__t) == 0;
 }
 
+#if defined(__VALI__)
+struct __libcpp_c11_start_data {
+  void* (*__func)(void*);
+  void* __arg;
+};
+inline _LIBCPP_HIDE_FROM_ABI int __libcpp_c11_start(void* __p) {
+  auto __data = *static_cast<__libcpp_c11_start_data*>(__p);
+  ::free(__p);
+  __data.__func(__data.__arg);
+  return 0;
+}
+#endif
+
 inline _LIBCPP_HIDE_FROM_ABI int __libcpp_thread_create(__libcpp_thread_t* __t, void* (*__func)(void*), void* __arg) {
+#if defined(__VALI__)
+  auto* __data = static_cast<__libcpp_c11_start_data*>(::malloc(sizeof(__libcpp_c11_start_data)));
+  if (!__data)
+    return ENOMEM;
+  __data->__func = __func;
+  __data->__arg = __arg;
+  int __ec = thrd_create(__t, __libcpp_c11_start, __data);
+  if (__ec != thrd_success)
+    ::free(__data);
+#else
   int __ec = thrd_create(__t, reinterpret_cast<thrd_start_t>(__func), __arg);
+#endif
 #if defined(VALI)
   return __ec == thrd_success ? 0 : (__ec == thrd_nomem ? ENOMEM : EINVAL);
 #else

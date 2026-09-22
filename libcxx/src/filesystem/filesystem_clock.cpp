@@ -57,6 +57,11 @@ _FilesystemClock::time_point _FilesystemClock::now() noexcept {
   GetSystemTimeAsFileTime(&time);
   detail::TimeSpec tp = detail::filetime_to_timespec(time);
   return time_point(__secs(tp.tv_sec) + chrono::duration_cast<duration>(__nsecs(tp.tv_nsec)));
+#elif defined(__VALI__)
+  timespec ts;
+  if (timespec_get(&ts, TIME_UTC) != 0)
+    std::__throw_system_error(errno, "timespec_get(TIME_UTC) failed");
+  return time_point(__secs(ts.tv_sec) + __secs(946684800) + chrono::duration_cast<duration>(chrono::nanoseconds(ts.tv_nsec)));
 #elif defined(_LIBCPP_HAS_TIMESPEC_GET)
   typedef chrono::duration<rep, nano> __nsecs;
   struct timespec ts;

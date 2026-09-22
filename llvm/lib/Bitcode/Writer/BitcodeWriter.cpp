@@ -5946,6 +5946,7 @@ static const char *getSectionNameForBitcode(const Triple &T) {
   case Triple::MachO:
     return "__LLVM,__bitcode";
   case Triple::COFF:
+  case Triple::VPE:
   case Triple::ELF:
   case Triple::Wasm:
   case Triple::UnknownObjectFormat:
@@ -5973,6 +5974,7 @@ static const char *getSectionNameForCommandline(const Triple &T) {
   case Triple::MachO:
     return "__LLVM,__cmdline";
   case Triple::COFF:
+  case Triple::VPE:
   case Triple::ELF:
   case Triple::Wasm:
   case Triple::UnknownObjectFormat:

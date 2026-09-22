@@ -2385,6 +2385,7 @@ bool GDBRemoteCommunicationClient::GetCurrentProcessInfo(bool allow_lazy) {
           m_process_arch.SetArchitecture(eArchTypeELF, cpu, sub);
           break;
         case llvm::Triple::COFF:
+        case llvm::Triple::VPE:
           m_process_arch.SetArchitecture(eArchTypeCOFF, cpu, sub);
           break;
         case llvm::Triple::GOFF:

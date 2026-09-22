@@ -30,6 +30,8 @@
 #  define WIN32_LEAN_AND_MEAN
 #  define NOMINMAX
 #  include <windows.h>
+#elif defined(__VALI__)
+#  include <io.h>
 #else
 #  include <dirent.h>
 #  include <sys/stat.h>
@@ -37,7 +39,9 @@
 #  include <sys/types.h>
 #  include <unistd.h>
 #endif
-#include <fcntl.h> /* values for fchmodat */
+#if !defined(__VALI__)
+#  include <fcntl.h> /* values for fchmodat */
+#endif
 #include <time.h>
 
 // since Linux 4.5 and FreeBSD 13, but the Linux libc wrapper is only provided by glibc >= 2.27 and musl
@@ -564,7 +568,7 @@ void __create_symlink(path const& from, path const& to, error_code* ec) {
 path __current_path(error_code* ec) {
   ErrorHandler<path> err("current_path", ec);
 
-#if defined(_LIBCPP_WIN32API) || defined(__GLIBC__) || defined(__APPLE__)
+#if defined(_LIBCPP_WIN32API) || defined(__GLIBC__) || defined(__APPLE__) || defined(__VALI__)
   // Common extension outside of POSIX getcwd() spec, without needing to
   // preallocate a buffer. Also supported by a number of other POSIX libcs.
   int size              = 0;
@@ -651,7 +655,12 @@ uintmax_t __hard_link_count(const path& p, error_code* ec) {
   detail::posix_stat(p, st, &m_ec);
   if (m_ec)
     return err.report(m_ec);
+#if defined(__VALI__)
+  // Vali file metadata does not expose the number of hard links.
+  return err.report(errc::operation_not_supported);
+#else
   return static_cast<uintmax_t>(st.st_nlink);
+#endif
 }
 
 bool __fs_is_empty(const path& p, error_code* ec) {
@@ -763,7 +772,12 @@ void __permissions(const path& p, perms prms, perm_options opts, error_code* ec)
 #else
   if (set_sym_perms)
     return err.report(errc::operation_not_supported);
-  if (::chmod(p.c_str(), real_perms) == -1) {
+#if defined(__VALI__)
+  if (detail::chmod(p.c_str(), real_perms) == -1)
+#else
+  if (::chmod(p.c_str(), real_perms) == -1)
+#endif
+  {
     return err.report(capture_errno());
   }
 #endif
@@ -819,7 +833,7 @@ bool __remove(const path& p, error_code* ec) {
 //
 // The second implementation is used on platforms where `openat()` & friends are available,
 // and it threads file descriptors through recursive calls to avoid such race conditions.
-#if defined(_LIBCPP_WIN32API) || defined(__MVS__)
+#if defined(_LIBCPP_WIN32API) || defined(__MVS__) || defined(__VALI__)
 #  define REMOVE_ALL_USE_DIRECTORY_ITERATOR
 #endif
 

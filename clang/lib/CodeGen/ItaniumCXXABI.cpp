@@ -4420,6 +4420,12 @@ llvm::Constant *ItaniumRTTIBuilder::BuildTypeInfo(
   // All of this is to say that it's important that both the type_info
   // object and the type_info name be uniqued when weakly emitted.
 
+  // VPE exports must remain externally visible even with -fvisibility=hidden.
+  if (CGM.getTriple().isOSVali() &&
+      (DLLStorageClass == llvm::GlobalValue::DLLExportStorageClass ||
+       GVDLLStorageClass == llvm::GlobalValue::DLLExportStorageClass))
+    Visibility = llvm::GlobalValue::DefaultVisibility;
+
   TypeName->setVisibility(Visibility);
   CGM.setDSOLocal(TypeName);
 

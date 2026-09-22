@@ -34,9 +34,6 @@ set(LIBUNWIND_ASM_SOURCES
     UnwindRegistersRestore.S
     UnwindRegistersSave.S
     )
-if(MOLLENOS)
-  set_source_files_properties(${LIBUNWIND_ASM_SOURCES} PROPERTIES LANGUAGE C)
-endif()
 
 set(LIBUNWIND_HEADERS
     AddressSpace.hpp

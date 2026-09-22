@@ -232,7 +232,12 @@ public:
   basic_istream& operator=(const basic_istream& __rhs) = delete;
 
   // 27.7.1.1.3 Prefix/suffix:
+#if defined(__VALI__)
+  // Nested classes do not inherit the enclosing stream's DLL attributes.
+  class _LIBCPP_EXPORTED_FROM_ABI sentry;
+#else
   class sentry;
+#endif
 
   // 27.7.1.2 Formatted input:
   inline _LIBCPP_HIDE_FROM_ABI_SINCE_LLVM8 basic_istream& operator>>(basic_istream& (*__pf)(basic_istream&)) {

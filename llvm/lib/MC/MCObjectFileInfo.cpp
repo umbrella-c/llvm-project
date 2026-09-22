@@ -691,7 +691,7 @@ void MCObjectFileInfo::initCOFFMCObjectFileInfo(const Triple &T) {
   EHFrameSection = Ctx->getCOFFSection(
       ".eh_frame", COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
                        COFF::IMAGE_SCN_MEM_READ |
-                       (T.isOSBinFormatVPE() ? COFF::IMAGE_SCN_MEM_WRITE : 0));
+                       (T.isOSBinFormatVPE() ? unsigned(COFF::IMAGE_SCN_MEM_WRITE) : 0U));
   if (T.isOSBinFormatVPE())
     LSDASection = Ctx->getCOFFSection(".gcc_except_table",
                                       COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |

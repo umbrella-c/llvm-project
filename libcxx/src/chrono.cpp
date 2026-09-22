@@ -119,6 +119,16 @@ static system_clock::time_point __libcpp_system_clock_now() {
   return system_clock::time_point(duration_cast<system_clock::duration>(d - nt_to_unix_epoch));
 }
 
+#elif defined(__VALI__)
+
+static system_clock::time_point __libcpp_system_clock_now() {
+  timespec ts;
+  if (timespec_get(&ts, TIME_UTC) != 0)
+    std::__throw_system_error(errno, "timespec_get(TIME_UTC) failed");
+  // Vali timestamps start in 2000; system_clock and time_t use the Unix epoch.
+  return system_clock::time_point(seconds(ts.tv_sec) + seconds(946684800) + microseconds(ts.tv_nsec / 1000));
+}
+
 #elif defined(_LIBCPP_HAS_TIMESPEC_GET)
 
 static system_clock::time_point __libcpp_system_clock_now() {
@@ -227,6 +237,15 @@ static steady_clock::time_point __libcpp_steady_clock_now() noexcept {
 #    pragma comment(lib, "zircon")
 
   return steady_clock::time_point(nanoseconds(_zx_clock_get_monotonic()));
+}
+
+#  elif defined(__VALI__)
+
+static steady_clock::time_point __libcpp_steady_clock_now() {
+  timespec ts;
+  if (timespec_get(&ts, TIME_MONOTONIC) != 0)
+    std::__throw_system_error(errno, "timespec_get(TIME_MONOTONIC) failed");
+  return steady_clock::time_point(seconds(ts.tv_sec) + nanoseconds(ts.tv_nsec));
 }
 
 #  elif defined(_LIBCPP_HAS_TIMESPEC_GET)

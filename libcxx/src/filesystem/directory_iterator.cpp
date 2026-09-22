@@ -21,6 +21,8 @@
 #  define WIN32_LEAN_AND_MEAN
 #  define NOMINMAX
 #  include <windows.h>
+#elif defined(__VALI__)
+#  include <io.h>
 #else
 #  include <dirent.h> // for DIR & friends
 #endif

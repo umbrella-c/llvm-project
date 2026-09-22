@@ -57,6 +57,13 @@ if(DEFINED ENV{VALI_RUNTIME_PATH})
     include_directories(BEFORE "$ENV{VALI_RUNTIME_PATH}/include/c++/v1")
 endif()
 
+if(IS_DIRECTORY "$ENV{VALI_SDK_PATH}/librt/libc/include")
+    include_directories(BEFORE "$ENV{VALI_SDK_PATH}/librt/libc/include")
+endif()
+if(IS_DIRECTORY "$ENV{VALI_SDK_PATH}/librt/libos/include")
+    include_directories(BEFORE "$ENV{VALI_SDK_PATH}/librt/libos/include")
+endif()
+
 ##################################################
 # Setup LLVM custom options
 ##################################################

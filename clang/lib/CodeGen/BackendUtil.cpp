@@ -288,6 +288,8 @@ static bool asanUseGlobalsGC(const Triple &T, const CodeGenOptions &CGOpts) {
     return true;
   case Triple::ELF:
     return !CGOpts.DisableIntegratedAS;
+  case Triple::VPE:
+    llvm::report_fatal_error("ASan not implemented for VPE");
   case Triple::GOFF:
     llvm::report_fatal_error("ASan not implemented for GOFF");
   case Triple::XCOFF:

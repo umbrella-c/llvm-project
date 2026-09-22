@@ -112,6 +112,12 @@ size_t wcsrtombs(char* restrict dst, const wchar_t** restrict src, size_t len,
 // The inclusion of the system's <wchar.h> is intentionally done once outside of any include
 // guards because some code expects to be able to include the underlying system header multiple
 // times to get different definitions based on the macros that are set before inclusion.
+#  if defined(VALI)
+// Vali declares wide stream functions in stdio.h and multibyte conversions in stdlib.h.
+#    include <stdio.h>
+#    include <stdlib.h>
+#  endif
+
 #  if __has_include_next(<wchar.h>)
 #    include_next <wchar.h>
 #  endif

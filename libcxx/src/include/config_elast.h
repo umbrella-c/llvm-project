@@ -21,6 +21,9 @@
 // where strerror/strerror_r can't handle out-of-range errno values.
 #if defined(ELAST)
 #  define _LIBCPP_ELAST ELAST
+#elif defined(__VALI__)
+#  include <stdio.h>
+#  define _LIBCPP_ELAST (_MAX_ERRNO - 1)
 #elif _LIBCPP_LIBC_LLVM_LIBC
 // No _LIBCPP_ELAST needed for LLVM libc
 #elif _LIBCPP_LIBC_NEWLIB

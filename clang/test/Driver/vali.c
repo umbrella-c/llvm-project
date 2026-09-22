@@ -25,7 +25,7 @@
 
 // CXX: "{{[^"]*}}/sdk/include/c++/v1"
 // CXX: "{{[^"]*}}/cross/bin/lld-link"
-// CXX-SAME: "c++.dll.lib" "unwind.dll.lib"
+// CXX-SAME: "c++.dll.lib" "c++abi.dll.lib" "unwind.dll.lib"
 
 // NOSTDLIB: "{{[^"]*}}/cross/bin/lld-link"
 // NOSTDLIB-NOT: -entry:

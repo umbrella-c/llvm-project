@@ -175,6 +175,9 @@ include(FindLibcCommonUtils)
 # Build the shared library.
 if (LIBCXX_SUPPORTS_SHARED_LIBRARY)
   add_library(cxx_shared SHARED ${LIBCXX_SOURCES} ${LIBCXX_HEADERS})
+  if(VALI)
+    target_sources(cxx_shared PRIVATE vali_main.cpp)
+  endif()
   target_include_directories(cxx_shared PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
   target_link_libraries(cxx_shared PUBLIC cxx-headers runtimes-libc-shared
                                    PRIVATE ${LIBCXX_LIBRARIES}
@@ -259,7 +262,9 @@ if (LIBCXX_SUPPORTS_SHARED_LIBRARY)
   endif()
 endif(LIBCXX_SUPPORTS_SHARED_LIBRARY)
 
-set(CMAKE_STATIC_LIBRARY_PREFIX "lib")
+if(NOT VALI)
+  set(CMAKE_STATIC_LIBRARY_PREFIX "lib")
+endif()
 
 # Build the static library.
 add_library(cxx_static STATIC ${LIBCXX_SOURCES} ${LIBCXX_HEADERS})
@@ -291,6 +296,10 @@ if (LIBCXX_HERMETIC_STATIC_LIBRARY)
   # _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS can be defined in __config_site
   # too. Define it in the same way here, to avoid redefinition conflicts.
   target_compile_definitions(cxx_static PRIVATE _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS=)
+endif()
+
+if(VALI)
+  target_compile_definitions(cxx_static PRIVATE _LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS)
 endif()
 
 # Attempt to merge the libc++.a archive and the ABI library archive into one.

@@ -25,8 +25,13 @@
 #if defined(_LIBCPP_USING_GETENTROPY)
 #  include <sys/random.h>
 #elif defined(_LIBCPP_USING_DEV_RANDOM)
-#  include <fcntl.h>
-#  include <unistd.h>
+#  if defined(__VALI__)
+#    include <io.h>
+#    include <sys/types.h>
+#  else
+#    include <fcntl.h>
+#    include <unistd.h>
+#  endif
 #  if __has_include(<sys/ioctl.h>) && __has_include(<linux/random.h>)
 #    include <linux/random.h>
 #    include <sys/ioctl.h>

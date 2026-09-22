@@ -145,11 +145,16 @@ namespace {
 #if _LIBCPP_HAS_THREADS
 
 //  GLIBC also uses 1024 as the maximum buffer size internally.
+#  if !defined(__VALI__)
 constexpr size_t strerror_buff_size = 1024;
+#  endif
 
 string do_strerror_r(int ev);
 
-#  if defined(_LIBCPP_MSVCRT_LIKE)
+#  if defined(__VALI__)
+// Vali strerror returns immutable strings from its errno table.
+string do_strerror_r(int ev) { return string(::strerror(ev)); }
+#  elif defined(_LIBCPP_MSVCRT_LIKE)
 string do_strerror_r(int ev) {
   char buffer[strerror_buff_size];
   if (::strerror_s(buffer, strerror_buff_size, ev) == 0)

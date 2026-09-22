@@ -205,6 +205,9 @@ if (LIBCXXABI_SUPPORTS_SHARED_LIBRARY)
   endif()
 
   add_library(cxxabi_shared SHARED)
+  if (VALI)
+    target_sources(cxxabi_shared PRIVATE vali_main.cpp)
+  endif()
   set_target_properties(cxxabi_shared
     PROPERTIES
       EXCLUDE_FROM_ALL "$<IF:$<BOOL:${LIBCXXABI_ENABLE_SHARED}>,FALSE,TRUE>"

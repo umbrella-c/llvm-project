@@ -124,6 +124,8 @@
 #    include <__locale_dir/support/llvm_libc.h>
 #  elif defined(__linux__)
 #    include <__locale_dir/support/linux.h>
+#  elif defined(__VALI__)
+#    include <__locale_dir/support/vali.h>
 #  elif _LIBCPP_LIBC_NEWLIB
 #    include <__locale_dir/support/newlib.h>
 #  elif defined(_AIX)

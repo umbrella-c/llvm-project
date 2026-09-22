@@ -74,7 +74,12 @@ protected:
 
 public:
   // 27.7.2.4 Prefix/suffix:
+#if defined(__VALI__)
+  // Nested classes do not inherit the enclosing stream's DLL attributes.
+  class _LIBCPP_EXPORTED_FROM_ABI sentry;
+#else
   class sentry;
+#endif
 
   // 27.7.2.6 Formatted output:
   inline _LIBCPP_HIDE_FROM_ABI_SINCE_LLVM8 basic_ostream& operator<<(basic_ostream& (*__pf)(basic_ostream&)) {

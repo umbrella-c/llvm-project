@@ -37,6 +37,11 @@
 #  include <io.h>
 #  include <windows.h>
 #  include <winioctl.h>
+#elif defined(__VALI__)
+#  include <io.h>
+#  include <os/services/file.h>
+#  include <os/services/path.h>
+#  include <os/mollenos.h>
 #else
 #  include <fcntl.h>
 #  include <sys/stat.h>
@@ -453,6 +458,8 @@ inline SSizeT readlink(const wchar_t* path, wchar_t* ret_buf, size_t bufsize) {
   return name_length / sizeof(wchar_t);
 }
 
+#elif defined(__VALI__)
+#  include "vali_compat.h"
 #else
 inline int symlink_file(const char* oldname, const char* newname) { return ::symlink(oldname, newname); }
 inline int symlink_dir(const char* oldname, const char* newname) { return ::symlink(oldname, newname); }

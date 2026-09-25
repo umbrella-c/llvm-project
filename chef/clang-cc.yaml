@@ -39,3 +39,16 @@ packs:
       The toolchain to use when cross compiling for vali/mollenos. It includes support
       for VPE binary formats, and neccessary changes required.
     type: toolchain
+    toolchain:
+      root: usr
+      cc: bin/clang
+      cxx: bin/clang++
+      ar: bin/llvm-ar
+      ranlib: bin/llvm-ranlib
+      strip: bin/llvm-strip
+      llvm-config: bin/llvm-config
+      targets:
+        - name: vali
+          triple: "$[[ CHEF_TARGET_ARCHITECTURE ]]-uml-vali"
+          compiler-args:
+            - "--target=$[[ TOOLCHAIN_TARGET_TRIPLE ]]"

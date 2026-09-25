@@ -890,7 +890,9 @@ endif()
 # By default libc++ on Windows expects to use a shared library, which requires
 # the headers to use DLL import/export semantics. However when building a
 # static library only we modify the headers to disable DLL import/export.
-if ((WIN32 OR VALI) AND LIBCXX_ENABLE_STATIC AND NOT LIBCXX_ENABLE_SHARED)
+# Vali selects static consumer annotations through the Clang driver, so its
+# installed headers remain usable for either library kind.
+if (WIN32 AND LIBCXX_ENABLE_STATIC AND NOT LIBCXX_ENABLE_SHARED)
   message(STATUS "Generating custom __config for non-DLL Windows build")
   config_define(ON _LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS)
 endif()

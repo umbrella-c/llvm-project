@@ -295,6 +295,20 @@ void ValiToolChain::AddClangCXXStdlibIncludeArgs(const ArgList &Args,
     addSystemInclude(Args, CC1Args, Root + "/include/c++/v1");
 }
 
+void ValiToolChain::addClangTargetOptions(
+    const ArgList &Args, ArgStringList &CC1Args, BoundArch BA,
+    Action::OffloadKind DeviceOffloadKind) const {
+  // Static consumers must not emit DLL imports, including when compiling
+  // separately from the link step or using explicitly supplied SDK headers.
+  if (Args.hasArg(options::OPT_static_libstdcxx) &&
+      !Args.hasArg(options::OPT_static) &&
+      GetCXXStdlibType(Args) == ToolChain::CST_Libcxx) {
+    Args.claimAllArgs(options::OPT_static_libstdcxx);
+    CC1Args.push_back("-D_LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS");
+    CC1Args.push_back("-D_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS");
+  }
+}
+
 void ValiToolChain::AddCXXStdlibLibArgs(
     const llvm::opt::ArgList &DriverArgs,
     llvm::opt::ArgStringList &CC1Args) const {

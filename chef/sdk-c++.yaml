@@ -41,7 +41,6 @@ recipes:
         - -DLLVM_ENABLE_LLD=ON
         - -DLLVM_ENABLE_LIBCXX=ON
         - -DLIBCXXABI_USE_LLVM_UNWINDER=ON
-        - -DLIBCXXABI_ENABLE_SHARED=OFF
         - -DLIBCXX_CXX_ABI='libcxxabi'
         - -DLIBCXX_ENABLE_STATIC_ABI_LIBRARY=ON
         - -DCMAKE_TOOLCHAIN_FILE=$[[ PROJECT_PATH ]]/chef/vali.cmake

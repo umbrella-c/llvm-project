@@ -46,10 +46,10 @@ AArch64MCInstLower::GetGlobalAddressSymbol(const MachineOperand &MO) const {
 MCSymbol *AArch64MCInstLower::GetGlobalValueSymbol(const GlobalValue *GV,
                                                    unsigned TargetFlags) const {
   const Triple &TheTriple = Printer.TM.getTargetTriple();
-  if (!TheTriple.isOSBinFormatCOFF())
+  if (!(TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE()))
     return Printer.getSymbolPreferLocal(*GV);
 
-  assert(TheTriple.isOSWindows() &&
+  assert((TheTriple.isOSWindows() || TheTriple.isOSVali()) &&
          "Windows is the only supported COFF target");
 
   bool IsIndirect =
@@ -322,7 +322,8 @@ MCOperand AArch64MCInstLower::LowerSymbolOperand(const MachineOperand &MO,
                                                  MCSymbol *Sym) const {
   if (Printer.TM.getTargetTriple().isOSBinFormatMachO())
     return lowerSymbolOperandMachO(MO, Sym);
-  if (Printer.TM.getTargetTriple().isOSBinFormatCOFF())
+  if (Printer.TM.getTargetTriple().isOSBinFormatCOFF() ||
+      Printer.TM.getTargetTriple().isOSBinFormatVPE())
     return lowerSymbolOperandCOFF(MO, Sym);
 
   assert(Printer.TM.getTargetTriple().isOSBinFormatELF() && "Invalid target");

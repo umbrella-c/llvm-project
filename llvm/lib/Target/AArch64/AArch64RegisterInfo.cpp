@@ -76,7 +76,8 @@ AArch64RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   const auto &F = MF->getFunction();
   const auto *TLI = MF->getSubtarget<AArch64Subtarget>().getTargetLowering();
   const bool Darwin = MF->getSubtarget<AArch64Subtarget>().isTargetDarwin();
-  const bool Windows = MF->getSubtarget<AArch64Subtarget>().isTargetWindows();
+  const auto &ST = MF->getSubtarget<AArch64Subtarget>();
+  const bool Windows = ST.isTargetWindows() || ST.getTargetTriple().isOSVali();
 
   if (TLI->supportSwiftError() &&
       F.getAttributes().hasAttrSomewhere(Attribute::SwiftError)) {

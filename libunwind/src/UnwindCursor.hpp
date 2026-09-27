@@ -58,6 +58,9 @@
 #include "Registers.hpp"
 #include "RWMutex.hpp"
 #include "Unwind-EHABI.h"
+#if defined(_LIBUNWIND_SUPPORT_PE_ARM64_UNWIND)
+#include "UnwindPEArm64.hpp"
+#endif
 
 #if defined(_LIBUNWIND_SUPPORT_SEH_UNWIND)
 // Provide a definition for the DISPATCHER_CONTEXT struct for old (Win7 and
@@ -1004,6 +1007,47 @@ public:
   static void *operator new(size_t, UnwindCursor<A, R> *p) { return p; }
 
 private:
+
+#if defined(_LIBUNWIND_SUPPORT_PE_ARM64_UNWIND)
+  bool getInfoFromPEArm64(pint_t pc, const UnwindInfoSections &sects) {
+    UnwindPEArm64<A> unwind(_addressSpace, sects.pe_image_base,
+                            sects.pe_image_size);
+    typename UnwindPEArm64<A>::Info info;
+    int found = unwind.find(uint32_t(pc - sects.pe_image_base), info);
+    memset(&_info, 0, sizeof(_info));
+    _info.extra = sects.pe_image_base;
+    _info.unwind_info_size = sects.pe_image_size;
+    _info.flags = pc; // lookup PC, adjusted for a return address
+    _info.format = found < 0 ? 2 : 1;
+    if (found > 0) {
+      _info.start_ip = sects.pe_image_base + info.begin;
+      _info.end_ip = sects.pe_image_base + info.end;
+      _info.unwind_info = info.entry;
+      _info.handler = info.handler ? sects.pe_image_base + info.handler : 0;
+      _info.lsda = info.lsda ? sects.pe_image_base + info.lsda : 0;
+    }
+    return true;
+  }
+
+  int stepWithPEArm64() {
+    if (_info.format == 2)
+      return UNW_EBADFRAME;
+    if (!_info.unwind_info) {
+      // Only a PC in a known executable image can reach this leaf path.
+      uint64_t lr = _registers.getRegister(30);
+      if (lr == _registers.getIP())
+        return UNW_EBADFRAME;
+      _registers.setIP(lr);
+      return UNW_STEP_SUCCESS;
+    }
+    UnwindPEArm64<A> unwind(_addressSpace, _info.extra, _info.unwind_info_size);
+    typename UnwindPEArm64<A>::Info info;
+    if (!unwind.read(uint32_t(_info.unwind_info), info) ||
+        !unwind.step(info, uint32_t(_info.flags - _info.extra), _registers))
+      return UNW_EBADFRAME;
+    return UNW_STEP_SUCCESS;
+  }
+#endif
 
 #if defined(_LIBUNWIND_ARM_EHABI)
   bool getInfoFromEHABISection(pint_t pc, const UnwindInfoSections &sects);
@@ -2889,6 +2933,10 @@ void UnwindCursor<A, R>::setInfoBasedOnIPRegister(bool isReturnAddress) {
   // Ask address space object to find unwind sections for this pc.
   UnwindInfoSections sects;
   if (_addressSpace.template findUnwindSections<R>(pc, sects)) {
+#if defined(_LIBUNWIND_SUPPORT_PE_ARM64_UNWIND)
+    if (this->getInfoFromPEArm64(pc, sects))
+      return;
+#endif
 #if defined(_LIBUNWIND_SUPPORT_COMPACT_UNWIND)
     // If there is a compact unwind encoding table, look there first.
     if (sects.compact_unwind_section != 0) {
@@ -3383,6 +3431,8 @@ template <typename A, typename R> int UnwindCursor<A, R>::step(bool stage2) {
   {
 #if defined(_LIBUNWIND_SUPPORT_COMPACT_UNWIND)
     result = this->stepWithCompactEncoding(stage2);
+#elif defined(_LIBUNWIND_SUPPORT_PE_ARM64_UNWIND)
+    result = this->stepWithPEArm64();
 #elif defined(_LIBUNWIND_SUPPORT_SEH_UNWIND)
     result = this->stepWithSEHData();
 #elif defined(_LIBUNWIND_SUPPORT_TBTAB_UNWIND)

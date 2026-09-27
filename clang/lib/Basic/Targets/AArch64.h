@@ -306,6 +306,14 @@ LinuxTargetInfo<AArch64leTargetInfo>::setABI(const std::string &Name) {
   return AArch64leTargetInfo::setABI(Name);
 }
 
+// Vali uses LLP64 scalars with the base AAPCS64 procedure call convention.
+// Do not derive from WindowsARM64TargetInfo: its va_list and PCS differ.
+class LLVM_LIBRARY_VISIBILITY ValiARM64TargetInfo
+    : public ValiTargetInfo<AArch64leTargetInfo> {
+public:
+  ValiARM64TargetInfo(const llvm::Triple &Triple, const TargetOptions &Opts);
+};
+
 class LLVM_LIBRARY_VISIBILITY WindowsARM64TargetInfo
     : public WindowsTargetInfo<AArch64leTargetInfo> {
   const llvm::Triple Triple;

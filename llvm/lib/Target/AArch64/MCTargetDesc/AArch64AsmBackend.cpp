@@ -148,7 +148,7 @@ static uint64_t adjustFixupValue(const MCFixup &Fixup, const MCValue &Target,
     return AdrImmBits(Value & 0x1fffffULL);
   case AArch64::fixup_aarch64_pcrel_adrp_imm21:
     assert(!IsResolved);
-    if (TheTriple.isOSBinFormatCOFF()) {
+    if (TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE()) {
       if (!isInt<21>(SignedValue))
         Ctx.reportError(Fixup.getLoc(), "fixup value out of range");
       return AdrImmBits(Value & 0x1fffffULL);
@@ -165,14 +165,16 @@ static uint64_t adjustFixupValue(const MCFixup &Fixup, const MCValue &Target,
     return (Value >> 2) & 0x7ffff;
   case AArch64::fixup_aarch64_add_imm12:
   case AArch64::fixup_aarch64_ldst_imm12_scale1:
-    if (TheTriple.isOSBinFormatCOFF() && !IsResolved)
+    if ((TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE()) &&
+        !IsResolved)
       Value &= 0xfff;
     // Unsigned 12-bit immediate
     if (!isUInt<12>(Value))
       Ctx.reportError(Fixup.getLoc(), "fixup value out of range");
     return Value;
   case AArch64::fixup_aarch64_ldst_imm12_scale2:
-    if (TheTriple.isOSBinFormatCOFF() && !IsResolved)
+    if ((TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE()) &&
+        !IsResolved)
       Value &= 0xfff;
     // Unsigned 12-bit immediate which gets multiplied by 2
     if (!isUInt<13>(Value))
@@ -181,7 +183,8 @@ static uint64_t adjustFixupValue(const MCFixup &Fixup, const MCValue &Target,
       Ctx.reportError(Fixup.getLoc(), "fixup must be 2-byte aligned");
     return Value >> 1;
   case AArch64::fixup_aarch64_ldst_imm12_scale4:
-    if (TheTriple.isOSBinFormatCOFF() && !IsResolved)
+    if ((TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE()) &&
+        !IsResolved)
       Value &= 0xfff;
     // Unsigned 12-bit immediate which gets multiplied by 4
     if (!isUInt<14>(Value))
@@ -190,7 +193,8 @@ static uint64_t adjustFixupValue(const MCFixup &Fixup, const MCValue &Target,
       Ctx.reportError(Fixup.getLoc(), "fixup must be 4-byte aligned");
     return Value >> 2;
   case AArch64::fixup_aarch64_ldst_imm12_scale8:
-    if (TheTriple.isOSBinFormatCOFF() && !IsResolved)
+    if ((TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE()) &&
+        !IsResolved)
       Value &= 0xfff;
     // Unsigned 12-bit immediate which gets multiplied by 8
     if (!isUInt<15>(Value))
@@ -199,7 +203,8 @@ static uint64_t adjustFixupValue(const MCFixup &Fixup, const MCValue &Target,
       Ctx.reportError(Fixup.getLoc(), "fixup must be 8-byte aligned");
     return Value >> 3;
   case AArch64::fixup_aarch64_ldst_imm12_scale16:
-    if (TheTriple.isOSBinFormatCOFF() && !IsResolved)
+    if ((TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE()) &&
+        !IsResolved)
       Value &= 0xfff;
     // Unsigned 12-bit immediate which gets multiplied by 16
     if (!isUInt<16>(Value))
@@ -318,7 +323,8 @@ static uint64_t adjustFixupValue(const MCFixup &Fixup, const MCValue &Target,
     return (Value >> 2) & 0xffff;
   case AArch64::fixup_aarch64_pcrel_branch26:
   case AArch64::fixup_aarch64_pcrel_call26:
-    if (TheTriple.isOSBinFormatCOFF() && !IsResolved && SignedValue != 0) {
+    if ((TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE()) &&
+        !IsResolved && SignedValue != 0) {
       // MSVC link.exe and lld do not support this relocation type
       // with a non-zero offset
       Ctx.reportError(Fixup.getLoc(),
@@ -785,7 +791,7 @@ MCAsmBackend *llvm::createAArch64leAsmBackend(const Target &T,
     return new DarwinAArch64AsmBackend(T, TheTriple, MRI);
   }
 
-  if (TheTriple.isOSBinFormatCOFF())
+  if (TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE())
     return new COFFAArch64AsmBackend(T, TheTriple);
 
   assert(TheTriple.isOSBinFormatELF() && "Invalid target");

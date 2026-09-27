@@ -675,7 +675,12 @@ DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_arm64_jumpto)
   ldp    x14,x15, [x0, #0x070]
   // x16 and x17 were clobbered by the call into the unwinder, so no point in
   // restoring them.
+#if defined(__VALI__)
+  // x18 is platform-owned; do not replace it with captured context state.
+  ldr    x19,     [x0, #0x098]
+#else
   ldp    x18,x19, [x0, #0x090]
+#endif
   ldp    x20,x21, [x0, #0x0A0]
   ldp    x22,x23, [x0, #0x0B0]
 #if defined(__LFI__)

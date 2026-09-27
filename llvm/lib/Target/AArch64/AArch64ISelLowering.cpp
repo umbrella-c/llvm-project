@@ -1284,7 +1284,7 @@ AArch64TargetLowering::AArch64TargetLowering(const TargetMachine &TM,
   // Don't align loops on Windows. The SEH unwind info generation needs to
   // know the exact length of functions before the alignments have been
   // expanded.
-  if (!Subtarget->isTargetWindows())
+  if (!Subtarget->isTargetCOFF())
     setPrefLoopAlignment(STI.getPrefLoopAlignment());
   setMaxBytesForAlignment(STI.getMaxBytesForLoopAlignment());
   setPrefFunctionAlignment(STI.getPrefFunctionAlignment());
@@ -11527,22 +11527,25 @@ AArch64TargetLowering::LowerELFGlobalTLSAddress(SDValue Op,
 }
 
 SDValue
-AArch64TargetLowering::LowerWindowsGlobalTLSAddress(SDValue Op,
-                                                    SelectionDAG &DAG) const {
-  assert(Subtarget->isTargetWindows() && "Windows specific TLS lowering");
+AArch64TargetLowering::LowerCOFFGlobalTLSAddress(SDValue Op,
+                                                 SelectionDAG &DAG) const {
+  assert(Subtarget->isTargetCOFF() && "COFF TLS lowering");
 
   SDValue Chain = DAG.getEntryNode();
   EVT PtrVT = getPointerTy(DAG.getDataLayout());
   SDLoc DL(Op);
 
-  SDValue TEB = DAG.getRegister(AArch64::X18, MVT::i64);
+  SDValue TLSArray;
+  if (Subtarget->isTargetWindows()) {
+    SDValue TEB = DAG.getRegister(AArch64::X18, MVT::i64);
 
-  // Load the ThreadLocalStoragePointer from the TEB
-  // A pointer to the TLS array is located at offset 0x58 from the TEB.
-  SDValue TLSArray =
-      DAG.getNode(ISD::ADD, DL, PtrVT, TEB, DAG.getIntPtrConstant(0x58, DL));
-  TLSArray = DAG.getLoad(PtrVT, DL, Chain, TLSArray, MachinePointerInfo());
-  Chain = TLSArray.getValue(1);
+    // Load the ThreadLocalStoragePointer from the TEB
+    // A pointer to the TLS array is located at offset 0x58 from the TEB.
+    TLSArray =
+        DAG.getNode(ISD::ADD, DL, PtrVT, TEB, DAG.getIntPtrConstant(0x58, DL));
+    TLSArray = DAG.getLoad(PtrVT, DL, Chain, TLSArray, MachinePointerInfo());
+    Chain = TLSArray.getValue(1);
+  }
 
   // Load the TLS index from the C runtime;
   // This does the same as getAddr(), but without having a GlobalAddressSDNode.
@@ -11558,15 +11561,31 @@ AArch64TargetLowering::LowerWindowsGlobalTLSAddress(SDValue Op,
   TLSIndex = DAG.getLoad(MVT::i32, DL, Chain, TLSIndex, MachinePointerInfo());
   Chain = TLSIndex.getValue(1);
 
-  // The pointer to the thread's TLS data area is at the TLS Index scaled by 8
-  // offset into the TLSArray.
-  TLSIndex = DAG.getNode(ISD::ZERO_EXTEND, DL, PtrVT, TLSIndex);
-  SDValue Slot = DAG.getNode(ISD::SHL, DL, PtrVT, TLSIndex,
-                             DAG.getConstant(3, DL, PtrVT));
-  SDValue TLS = DAG.getLoad(PtrVT, DL, Chain,
-                            DAG.getNode(ISD::ADD, DL, PtrVT, TLSArray, Slot),
-                            MachinePointerInfo());
-  Chain = TLS.getValue(1);
+  SDValue TLS;
+  if (Subtarget->getTargetTriple().isOSVali()) {
+    // The Vali CRT owns the thread-pointer layout. Pass the PE module index
+    // to its accessor, then apply the same section-relative offset as COFF.
+    ArgListTy Args;
+    Args.emplace_back(TLSIndex, Type::getInt32Ty(*DAG.getContext()));
+    TargetLowering::CallLoweringInfo CLI(DAG);
+    CLI.setDebugLoc(DL).setChain(Chain).setLibCallee(
+        CallingConv::C, PointerType::get(*DAG.getContext(), 0),
+        DAG.getExternalSymbol("__vali_tls_get_block", PtrVT), std::move(Args));
+    TLS = LowerCallTo(CLI).first;
+    MachineFrameInfo &MFI = DAG.getMachineFunction().getFrameInfo();
+    MFI.setAdjustsStack(true);
+    MFI.setHasCalls(true);
+  } else {
+    // The pointer to the thread's TLS data area is at the TLS Index scaled by 8
+    // offset into the TLSArray.
+    TLSIndex = DAG.getNode(ISD::ZERO_EXTEND, DL, PtrVT, TLSIndex);
+    SDValue Slot = DAG.getNode(ISD::SHL, DL, PtrVT, TLSIndex,
+                               DAG.getConstant(3, DL, PtrVT));
+    TLS = DAG.getLoad(PtrVT, DL, Chain,
+                      DAG.getNode(ISD::ADD, DL, PtrVT, TLSArray, Slot),
+                      MachinePointerInfo());
+    Chain = TLS.getValue(1);
+  }
 
   const GlobalAddressSDNode *GA = cast<GlobalAddressSDNode>(Op);
   const GlobalValue *GV = GA->getGlobal();
@@ -11595,8 +11614,8 @@ SDValue AArch64TargetLowering::LowerGlobalTLSAddress(SDValue Op,
     return LowerDarwinGlobalTLSAddress(Op, DAG);
   if (Subtarget->isTargetELF())
     return LowerELFGlobalTLSAddress(Op, DAG);
-  if (Subtarget->isTargetWindows())
-    return LowerWindowsGlobalTLSAddress(Op, DAG);
+  if (Subtarget->isTargetCOFF())
+    return LowerCOFFGlobalTLSAddress(Op, DAG);
 
   llvm_unreachable("Unexpected platform trying to use TLS");
 }
@@ -18288,7 +18307,7 @@ AArch64TargetLowering::LowerDYNAMIC_STACKALLOC(SDValue Op,
                                                SelectionDAG &DAG) const {
   MachineFunction &MF = DAG.getMachineFunction();
 
-  if (Subtarget->isTargetWindows())
+  if (Subtarget->isTargetWindows() || Subtarget->getTargetTriple().isOSVali())
     return LowerWindowsDYNAMIC_STACKALLOC(Op, DAG);
   else if (hasInlineStackProbe(MF))
     return LowerInlineDYNAMIC_STACKALLOC(Op, DAG);
@@ -35332,6 +35351,7 @@ unsigned AArch64TargetLowering::getVectorTypeBreakdownForCallingConv(
 bool AArch64TargetLowering::hasInlineStackProbe(
     const MachineFunction &MF) const {
   return !Subtarget->isTargetWindows() &&
+         !Subtarget->getTargetTriple().isOSVali() &&
          MF.getInfo<AArch64FunctionInfo>()->hasStackProbing();
 }
 

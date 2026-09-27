@@ -476,8 +476,10 @@ void AArch64TargetInfo::getTargetDefines(const LangOptions &Opts,
   if (Opts.UnsafeFPMath)
     Builder.defineMacro("__ARM_FP_FAST", "1");
 
-  Builder.defineMacro("__ARM_SIZEOF_WCHAR_T",
-                      Twine(Opts.WCharSize ? Opts.WCharSize : 4));
+  Builder.defineMacro(
+      "__ARM_SIZEOF_WCHAR_T",
+      Twine(Opts.WCharSize ? Opts.WCharSize
+                          : (getTriple().isOSVali() ? getWCharWidth() / 8 : 4)));
 
   Builder.defineMacro("__ARM_SIZEOF_MINIMAL_ENUM", Opts.ShortEnums ? "1" : "4");
 
@@ -1772,6 +1774,16 @@ void AArch64beTargetInfo::getTargetDefines(const LangOptions &Opts,
   Builder.defineMacro("__AARCH_BIG_ENDIAN");
   Builder.defineMacro("__ARM_BIG_ENDIAN");
   AArch64TargetInfo::getTargetDefines(Opts, Builder);
+}
+
+ValiARM64TargetInfo::ValiARM64TargetInfo(const llvm::Triple &Triple,
+                                         const TargetOptions &Opts)
+    : ValiTargetInfo<AArch64leTargetInfo>(Triple, Opts) {
+  LongWidth = LongAlign = 32;
+  LongDoubleWidth = LongDoubleAlign = 64;
+  LongDoubleFormat = &llvm::APFloat::IEEEdouble();
+  IntMaxType = Int64Type = PtrDiffType = IntPtrType = SignedLongLong;
+  SizeType = UnsignedLongLong;
 }
 
 WindowsARM64TargetInfo::WindowsARM64TargetInfo(const llvm::Triple &Triple,

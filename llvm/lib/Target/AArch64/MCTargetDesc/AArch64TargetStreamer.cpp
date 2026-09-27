@@ -144,7 +144,7 @@ llvm::createAArch64ObjectTargetStreamer(MCStreamer &S,
   const Triple &TT = STI.getTargetTriple();
   if (TT.isOSBinFormatELF())
     return new AArch64TargetELFStreamer(S);
-  if (TT.isOSBinFormatCOFF())
+  if (TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE())
     return new AArch64TargetWinCOFFStreamer(S);
   return nullptr;
 }

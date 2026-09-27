@@ -1937,10 +1937,12 @@ private:
   uint64_t lazyGetVG() const;
 
   void zaDisable() const {
+#if !defined(__VALI__)
     if (!_misc_registers.__has_sme)
       return;
     if (__libunwind_Registers_arm64_za_disable() != 0)
       _LIBUNWIND_ABORT("SME ZA disable failed");
+#endif
   }
 
 #if defined(__APPLE__)

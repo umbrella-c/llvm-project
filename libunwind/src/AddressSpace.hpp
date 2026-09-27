@@ -110,7 +110,8 @@ extern char __eh_frame_hdr_end;
 extern char __exidx_start;
 extern char __exidx_end;
 
-#elif defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) &&                            \
+#elif (defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) ||                          \
+       defined(_LIBUNWIND_SUPPORT_PE_ARM64_UNWIND)) &&                        \
       (defined(__MOLLENOS__) || defined(__VALI__))
 
 #include <os/unwind.h>
@@ -131,6 +132,10 @@ namespace libunwind {
 
 /// Used by findUnwindSections() to return info about needed sections.
 struct UnwindInfoSections {
+#if defined(_LIBUNWIND_SUPPORT_PE_ARM64_UNWIND)
+  uintptr_t pe_image_base = 0;
+  uint32_t pe_image_size = 0;
+#endif
 #if defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) ||                                \
     defined(_LIBUNWIND_SUPPORT_COMPACT_UNWIND) ||                              \
     defined(_LIBUNWIND_USE_DL_ITERATE_PHDR)
@@ -562,6 +567,24 @@ inline bool LocalAddressSpace::findUnwindSections(
                              (void *)info.arm_section, (void *)info.arm_section_length);
   if (info.arm_section && info.arm_section_length)
     return true;
+#elif defined(_LIBUNWIND_SUPPORT_PE_ARM64_UNWIND)
+  // UnwindGetSection must return the containing loaded module, including for
+  // leaf functions. ARM64 modules use the PE exception directory, not .eh_frame.
+  // The loader owns and validates the mapping and keeps it alive while used.
+  UnwindSection_t section;
+  if (UnwindGetSection((void *)targetAddr, &section) != OS_EOK)
+    return false;
+  pint_t base = (pint_t)section.ModuleBase;
+  if (!base || get16(base) != 0x5a4d)
+    return false;
+  uint32_t nt = get32(base + 0x3c);
+  // PE headers are loader-validated; reject unreasonable offsets nonetheless.
+  if (nt > 0x100000 || get32(base + nt) != 0x4550 ||
+      get16(base + nt + 24) != 0x20b)
+    return false;
+  info.pe_image_base = base;
+  info.pe_image_size = get32(base + nt + 24 + 56);
+  return targetAddr >= base && targetAddr - base < info.pe_image_size;
 #elif defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND) &&                            \
       (defined(__MOLLENOS__) || defined(__VALI__))
   UnwindSection_t section;

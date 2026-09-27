@@ -1,0 +1,4 @@
+LIBRARY vali-abi-test-runtime.dll
+EXPORTS
+__vali_tls_get_block
+escape

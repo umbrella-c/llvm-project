@@ -759,7 +759,7 @@ endif()
 
 set(COMPILER_RT_AARCH64_FMV_USES_GLOBAL_CONSTRUCTOR NOT(FUCHSIA OR APPLE))
 
-if (COMPILER_RT_HAS_AARCH64_SME)
+if (COMPILER_RT_HAS_AARCH64_SME AND NOT VALI)
   if (APPLE)
     list(APPEND aarch64_SOURCES aarch64/arm_apple_sme_abi.s)
     set_source_files_properties(aarch64/arm_apple_sme_abi.s PROPERTIES COMPILE_FLAGS -march=armv8a+sme)
@@ -844,6 +844,19 @@ set(armhf_SOURCES ${arm_SOURCES})
 set(armv7_SOURCES ${arm_SOURCES})
 set(armv7s_SOURCES ${arm_SOURCES})
 set(armv7k_SOURCES ${arm_SOURCES})
+# Vali bootstrap has no ELF CPU discovery, outline-atomic dispatcher or SME
+# runtime. Keep the portable arithmetic builtins and the ARM64 stack probe.
+if(VALI)
+  set(aarch64_SOURCES
+    ${GENERIC_SOURCES}
+    ${GENERIC_TF_SOURCES}
+    aarch64/fp_mode.c
+    aarch64/chkstk.S
+  )
+  # Keep gcc_personality_v0: Vali libunwind provides the Itanium _Unwind API
+  # on top of PE ARM64 frame descriptions.
+endif()
+
 set(arm64_SOURCES ${aarch64_SOURCES})
 set(arm64e_SOURCES ${aarch64_SOURCES})
 set(arm64_32_SOURCES ${aarch64_SOURCES})

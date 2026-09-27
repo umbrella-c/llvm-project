@@ -31,6 +31,8 @@
   #if defined(__aarch64__) || defined(__arm64__) || defined(__arm64e__)
     #define _LIBUNWIND_TRACE_RET_INJECT 1
   #endif
+#elif defined(__VALI__) && defined(__aarch64__)
+  #define _LIBUNWIND_SUPPORT_PE_ARM64_UNWIND 1
 #elif defined(__MOLLENOS__) || defined(__VALI__)
   #define _LIBUNWIND_SUPPORT_DWARF_UNWIND 1
 #elif defined(_WIN32)

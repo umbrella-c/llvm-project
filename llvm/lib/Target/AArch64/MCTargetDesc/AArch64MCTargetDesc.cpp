@@ -355,7 +355,7 @@ static MCAsmInfo *createAArch64MCAsmInfo(const MCRegisterInfo &MRI,
     MAI = new AArch64MCAsmInfoELF(TheTriple, Options);
   else if (TheTriple.isWindowsMSVCEnvironment())
     MAI = new AArch64MCAsmInfoMicrosoftCOFF(Options);
-  else if (TheTriple.isOSBinFormatCOFF())
+  else if (TheTriple.isOSBinFormatCOFF() || TheTriple.isOSBinFormatVPE())
     MAI = new AArch64MCAsmInfoGNUCOFF(Options);
   else
     reportFatalUsageError("unsupported object format");

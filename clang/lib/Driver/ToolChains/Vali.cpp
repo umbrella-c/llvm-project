@@ -47,7 +47,6 @@ void tools::Vali::Assembler::ConstructJob(Compilation &C, const JobAction &JA,
     return;
   case llvm::Triple::arm:
   case llvm::Triple::thumb:
-  case llvm::Triple::aarch64:
     break;
   case llvm::Triple::x86:
     CmdArgs.push_back("--32");
@@ -246,7 +245,7 @@ std::string ValiToolChain::computeSysRoot() const {
 
 ToolChain::UnwindTableLevel
 ValiToolChain::getDefaultUnwindTableLevel(const ArgList &Args) const {
-  // Preserve the original Vali unwind-table defaults. VPE uses DWARF.
+  // x86 Vali uses DWARF; AArch64 Vali uses PE unwind records.
   if (getArch() == llvm::Triple::x86_64 || getArch() == llvm::Triple::arm ||
       getArch() == llvm::Triple::thumb || getArch() == llvm::Triple::aarch64)
     return UnwindTableLevel::Asynchronous;
@@ -255,7 +254,8 @@ ValiToolChain::getDefaultUnwindTableLevel(const ArgList &Args) const {
 }
 
 bool ValiToolChain::isPICDefault() const {
-  return getArch() == llvm::Triple::x86_64;
+  return getArch() == llvm::Triple::x86_64 ||
+         getArch() == llvm::Triple::aarch64;
 }
 
 bool ValiToolChain::isPIEDefault(const llvm::opt::ArgList &Args) const {

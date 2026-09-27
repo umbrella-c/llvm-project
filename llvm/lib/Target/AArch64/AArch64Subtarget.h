@@ -317,7 +317,10 @@ public:
   bool isWindowsArm64EC() const { return TargetTriple.isWindowsArm64EC(); }
   bool isLFI() const { return TargetTriple.isLFI(); }
 
-  bool isTargetCOFF() const { return TargetTriple.isOSBinFormatCOFF(); }
+  bool isTargetCOFF() const {
+    return (TargetTriple.isOSBinFormatCOFF() ||
+            TargetTriple.isOSBinFormatVPE());
+  }
   bool isTargetELF() const { return TargetTriple.isOSBinFormatELF(); }
   bool isTargetMachO() const { return TargetTriple.isOSBinFormatMachO(); }
 

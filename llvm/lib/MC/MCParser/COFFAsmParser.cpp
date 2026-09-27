@@ -73,8 +73,9 @@ class COFFAsmParser : public MCAsmParserExtension {
     addDirectiveHandler<&COFFAsmParser::parseDirectiveSecNum>(".secnum");
     addDirectiveHandler<&COFFAsmParser::parseDirectiveSecOffset>(".secoffset");
 
-    // Vali uses DWARF CFI rather than Windows exception tables.
-    if (getContext().getTargetTriple().isOSBinFormatVPE())
+    // Vali x86 uses DWARF CFI; AArch64 Vali uses PE unwind tables.
+    if (getContext().getTargetTriple().isOSBinFormatVPE() &&
+        getContext().getTargetTriple().isX86())
       return;
 
     // Win64 EH directives.

@@ -125,7 +125,7 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
     case llvm::Triple::thumbeb:
       return std::make_unique<ValiTargetInfo<ARMbeTargetInfo>>(Triple, Opts);
     case llvm::Triple::aarch64:
-      return std::make_unique<ValiTargetInfo<AArch64leTargetInfo>>(Triple, Opts);
+      return std::make_unique<ValiARM64TargetInfo>(Triple, Opts);
     case llvm::Triple::aarch64_be:
       return std::make_unique<ValiTargetInfo<AArch64beTargetInfo>>(Triple, Opts);
     case llvm::Triple::mips:

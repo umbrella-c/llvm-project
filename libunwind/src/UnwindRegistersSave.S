@@ -851,6 +851,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 //   A status is placed in x0. A zero value indicates success; any non-zero
 //   value indicates failure.
 //
+#if !defined(__VALI__)
   .p2align 2
 DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_arm64_za_disable)
   .variant_pcs __libunwind_Registers_arm64_za_disable
@@ -897,6 +898,8 @@ DEFINE_LIBUNWIND_FUNCTION(__libunwind_Registers_arm64_za_disable)
 #else
   ret
 #endif
+
+#endif // !defined(__VALI__)
 
 #elif defined(__arm__) && !defined(__APPLE__)
 

@@ -383,19 +383,20 @@ static bool isLikelyToHaveSVEStack(const AArch64FrameLowering &AFL,
   return false;
 }
 
-static bool isTargetWindows(const MachineFunction &MF) {
+static bool usesWindowsFrameLayout(const MachineFunction &MF) {
   // TODO: Should this include targets like UEFI (which use Windows CFI)?
   // Note: Currently, there is not AArch64 support for UEFI. The value returned
   // here must align with the predicate used for returning the list of callee
   // saved regs in AArch64RegisterInfo::getCalleeSavedRegs(), so that we use
   // invalidateWindowsRegisterPairing() where appropriate.
-  return MF.getSubtarget<AArch64Subtarget>().isTargetWindows();
+  const auto &ST = MF.getSubtarget<AArch64Subtarget>();
+  return ST.isTargetWindows() || ST.getTargetTriple().isOSVali();
 }
 
 bool AArch64FrameLowering::hasSVECalleeSavesAboveFrameRecord(
     const MachineFunction &MF) const {
   auto *AFI = MF.getInfo<AArch64FunctionInfo>();
-  return isTargetWindows(MF) && AFI->getSVECalleeSavedStackSize();
+  return usesWindowsFrameLayout(MF) && AFI->getSVECalleeSavedStackSize();
 }
 
 /// Returns true if a homogeneous prolog or epilog code can be emitted
@@ -411,7 +412,7 @@ bool AArch64FrameLowering::homogeneousPrologEpilog(
     return false;
 
   // TODO: Window is supported yet.
-  if (isTargetWindows(MF))
+  if (usesWindowsFrameLayout(MF))
     return false;
 
   // TODO: SVE is not supported yet.
@@ -900,7 +901,9 @@ bool AArch64FrameLowering::windowsRequiresStackProbe(
   const AArch64FunctionInfo &MFI = *MF.getInfo<AArch64FunctionInfo>();
   // TODO: When implementing stack protectors, take that into account
   // for the probe threshold.
-  return Subtarget.isTargetWindows() && MFI.hasStackProbing() &&
+  return (Subtarget.isTargetWindows() ||
+          Subtarget.getTargetTriple().isOSVali()) &&
+         MFI.hasStackProbing() &&
          StackSizeInBytes >= uint64_t(MFI.getStackProbeSize());
 }
 
@@ -1688,7 +1691,7 @@ void computeCalleeSaveRegisterPairs(const AArch64FrameLowering &AFL,
   if (CSI.empty())
     return;
 
-  bool IsWindows = isTargetWindows(MF);
+  bool IsWindows = usesWindowsFrameLayout(MF);
   AArch64FunctionInfo *AFI = MF.getInfo<AArch64FunctionInfo>();
   unsigned StackHazardSize = getStackHazardSize(MF);
   MachineFrameInfo &MFI = MF.getFrameInfo();
@@ -2093,7 +2096,7 @@ bool AArch64FrameLowering::spillCalleeSavedRegisters(
       dbgs() << ")\n";
     });
 
-    assert((!isTargetWindows(MF) ||
+    assert((!usesWindowsFrameLayout(MF) ||
             !(Reg1 == AArch64::LR && Reg2 == AArch64::FP)) &&
            "Windows unwdinding requires a consecutive (FP,LR) pair");
     // Windows unwind codes require consecutive registers if registers are
@@ -2101,7 +2104,7 @@ bool AArch64FrameLowering::spillCalleeSavedRegisters(
     // and not (x+1,x).
     unsigned FrameIdxReg1 = RPI.FrameIdx;
     unsigned FrameIdxReg2 = RPI.FrameIdx + 1;
-    if (isTargetWindows(MF) && RPI.isPaired()) {
+    if (usesWindowsFrameLayout(MF) && RPI.isPaired()) {
       std::swap(Reg1, Reg2);
       std::swap(FrameIdxReg1, FrameIdxReg2);
     }
@@ -2271,7 +2274,7 @@ bool AArch64FrameLowering::restoreCalleeSavedRegisters(
     // and not (x+1,x).
     unsigned FrameIdxReg1 = RPI.FrameIdx;
     unsigned FrameIdxReg2 = RPI.FrameIdx + 1;
-    if (isTargetWindows(MF) && RPI.isPaired()) {
+    if (usesWindowsFrameLayout(MF) && RPI.isPaired()) {
       std::swap(Reg1, Reg2);
       std::swap(FrameIdxReg1, FrameIdxReg2);
     }
@@ -2796,7 +2799,7 @@ void AArch64FrameLowering::determineCalleeSaves(MachineFunction &MF,
 bool AArch64FrameLowering::assignCalleeSavedSpillSlots(
     MachineFunction &MF, const TargetRegisterInfo *RegInfo,
     std::vector<CalleeSavedInfo> &CSI) const {
-  bool IsWindows = isTargetWindows(MF);
+  bool IsWindows = usesWindowsFrameLayout(MF);
   unsigned StackHazardSize = getStackHazardSize(MF);
   // To match the canonical windows frame layout, reverse the list of
   // callee saved registers to get them laid out by PrologEpilogInserter

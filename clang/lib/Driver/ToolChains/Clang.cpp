@@ -1220,7 +1220,8 @@ static bool isSignedCharDefault(const llvm::Triple &Triple) {
   case llvm::Triple::armeb:
   case llvm::Triple::thumb:
   case llvm::Triple::thumbeb:
-    if (Triple.isOSDarwin() || Triple.isOSWindows())
+    if (Triple.isOSDarwin() || Triple.isOSWindows() ||
+        (Triple.isOSVali() && Triple.getArch() == llvm::Triple::aarch64))
       return true;
     return false;
 

@@ -2512,6 +2512,10 @@ bool Triple::isValidVersionForOS(OSType OSKind, const VersionTuple &Version) {
 }
 
 ExceptionHandling Triple::getDefaultExceptionHandling() const {
+  // Vali AArch64 uses PE unwind records with its own AAPCS64 runtime ABI.
+  if (isOSBinFormatVPE() && getArch() == Triple::aarch64)
+    return ExceptionHandling::WinEH;
+
   if (isOSBinFormatCOFF()) {
     if (getArch() == Triple::x86 &&
         (isOSCygMing() || isWindowsItaniumEnvironment()))

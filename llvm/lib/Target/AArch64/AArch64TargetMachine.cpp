@@ -308,7 +308,7 @@ void AArch64TargetMachine::reset() { SubtargetMap.clear(); }
 static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
   if (TT.isOSBinFormatMachO())
     return std::make_unique<AArch64_MachoTargetObjectFile>();
-  if (TT.isOSBinFormatCOFF())
+  if (TT.isOSBinFormatCOFF() || TT.isOSBinFormatVPE())
     return std::make_unique<AArch64_COFFTargetObjectFile>();
 
   return std::make_unique<AArch64_ELFTargetObjectFile>();
@@ -323,7 +323,7 @@ static StringRef computeDefaultCPU(const Triple &TT, StringRef CPU) {
 static Reloc::Model getEffectiveRelocModel(const Triple &TT,
                                            std::optional<Reloc::Model> RM) {
   // AArch64 Darwin and Windows are always PIC.
-  if (TT.isOSDarwin() || TT.isOSWindows())
+  if (TT.isOSDarwin() || TT.isOSWindows() || TT.isOSVali())
     return Reloc::PIC_;
   // On ELF platforms the default static relocation model has a smart enough
   // linker to cope with referencing external symbols defined in a shared

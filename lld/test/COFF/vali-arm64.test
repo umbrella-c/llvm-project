@@ -1,0 +1,48 @@
+# REQUIRES: aarch64
+# RUN: split-file %s %t
+# RUN: llvm-mc -triple=aarch64-uml-vali -filetype=obj %t/dll.s -o %t/dll.obj
+# RUN: lld-link /lldvpe /machine:arm64 /dll /noentry /nodefaultlib /manifest:no /dynamicbase /out:%t/fixture.dll /implib:%t/fixture.lib %t/dll.obj
+# RUN: llvm-mc -triple=aarch64-uml-vali -filetype=obj %t/exe.s -o %t/exe.obj
+# RUN: lld-link /lldvpe /machine:arm64 /entry:entry /subsystem:console /nodefaultlib /manifest:no /out:%t/fixture.exe %t/exe.obj %t/fixture.lib
+# RUN: llvm-readobj --file-headers --coff-exports --coff-basereloc %t/fixture.dll | FileCheck %s --check-prefix=DLL
+# RUN: llvm-readobj --file-headers --coff-imports %t/fixture.exe | FileCheck %s --check-prefix=EXE
+# DLL: Machine: IMAGE_FILE_MACHINE_ARM64
+# DLL: Magic: 0x20B
+# DLL: Name: exported_data
+# DLL: Name: exported_function
+# DLL: Name: exported_pointer
+# DLL: Type: DIR64
+# EXE: Machine: IMAGE_FILE_MACHINE_ARM64
+# EXE: Magic: 0x20B
+# EXE: Name: fixture.dll
+# EXE: Symbol: exported_data
+# EXE: Symbol: exported_function
+
+#--- dll.s
+.text
+.globl exported_function
+exported_function:
+  add w0, w0, #1
+  ret
+.data
+.globl exported_data
+exported_data:
+  .word 37
+.p2align 3
+.globl exported_pointer
+exported_pointer:
+  .xword exported_data
+.section .drectve,"yn"
+.ascii " /EXPORT:exported_data,DATA /EXPORT:exported_function /EXPORT:exported_pointer,DATA"
+
+#--- exe.s
+.text
+.globl entry
+entry:
+  stp x29, x30, [sp, #-16]!
+  adrp x0, __imp_exported_data
+  ldr x0, [x0, :lo12:__imp_exported_data]
+  ldr w0, [x0]
+  bl exported_function
+  ldp x29, x30, [sp], #16
+  ret

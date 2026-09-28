@@ -70,7 +70,15 @@ __attribute__((noinline)) static void force() {
   _Unwind_ForcedUnwind(&forced, stop, nullptr);
   test_exit(18);
 }
+#ifdef TEST_THREADED_TLS
+extern "C" void threaded_setup();
+extern "C" void threaded_verify();
+#endif
 extern "C" void entry() {
+#ifdef TEST_THREADED_TLS
+  threaded_setup();
+  threaded_verify();
+#endif
   if (!test_module_lookup())
     test_exit(11);
   register double saved __asm__("d8") = 123.5;

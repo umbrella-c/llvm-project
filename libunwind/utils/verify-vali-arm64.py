@@ -22,6 +22,7 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--bin', type=Path, required=True)
 p.add_argument('--vali', type=Path, required=True, help='Vali checkout (C/OS headers)')
 p.add_argument('--out', type=Path, required=True)
+p.add_argument('--threads', action='store_true', help='Test logical-job TLS with thread-enabled libc++abi')
 p.add_argument('--qemu', default='qemu-aarch64')
 p.add_argument('--builtins', type=Path, help='Validate against the complete Vali compiler-rt archive')
 a = p.parse_args()
@@ -61,6 +62,10 @@ config += '''
 #define _LIBCPP_HARDENING_MODE_DEFAULT _LIBCPP_HARDENING_MODE_NONE
 #define _LIBCPP_ASSERTION_SEMANTIC_DEFAULT _LIBCPP_ASSERTION_SEMANTIC_IGNORE
 '''
+if a.threads:
+    config = config.replace('#define _LIBCPP_HAS_MONOTONIC_CLOCK 0', '#define _LIBCPP_HAS_MONOTONIC_CLOCK 1')
+    config = config.replace('#define _LIBCPP_HAS_THREADS 0', '#define _LIBCPP_HAS_THREADS 1')
+    config = config.replace('#define _LIBCPP_HAS_THREAD_API_C11 0', '#define _LIBCPP_HAS_THREAD_API_C11 1')
 (inc / '__config_site').write_text(config)
 shutil.copyfile(root / 'libcxx/vendor/llvm/default_assertion_handler.in', inc / '__assertion_handler')
 resource = run('resource', [a.bin / 'clang', '-print-resource-dir']).strip()
@@ -94,11 +99,35 @@ cxxflags = ['-std=c++23', '-fexceptions', '-fcxx-exceptions',
             '-D_LIBCPP_BUILDING_LIBRARY', '-D_LIBCXXABI_BUILDING_LIBRARY',
             '-D_LIBCXXABI_HAS_NO_THREADS', '-D_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS',
             '-I' + str(inc), '-I' + str(root / 'libcxx/include'),
-            '-I' + str(root / 'libcxxabi/include'), '-I' + str(root / 'libcxx/src')]
+            '-I' + str(root / 'libcxxabi/include'), '-I' + str(root / 'libcxxabi/src'), '-I' + str(root / 'libcxx/src')]
+if a.threads:
+    cxxflags.remove('-D_LIBCXXABI_HAS_NO_THREADS')
+    cxxflags += ['-DHAVE___CXA_THREAD_ATEXIT_IMPL', '-DTEST_THREADED_TLS']
+    common += ['-I' + str(a.vali / 'librt/libddk/include'),
+               '-I' + str(a.vali / 'librt/libds/include')]
 for name in ['cxa_personality', 'cxa_exception', 'cxa_exception_storage',
              'cxa_handlers', 'cxa_aux_runtime', 'private_typeinfo',
              'stdlib_typeinfo', 'stdlib_exception', 'fallback_malloc', 'cxa_virtual']:
     compile(root / 'libcxxabi/src' / (name + '.cpp'), cxxflags)
+if a.threads:
+    compile(root / 'libcxxabi/src/cxa_thread_atexit.cpp', cxxflags)
+    for path in ['librt/libc/os/tls.c', 'librt/libc/os/tls_modules.c',
+                 'librt/libc/os/clang.c', 'librt/libos/spinlock.c',
+                 'librt/libc/threads/tss.c', 'librt/libds/hashtable.c',
+                 'librt/libcrt/crt/crtcoff.c']:
+        compile(a.vali / path)
+    compile(inputs / 'thread-platform.c')
+    compile(a.vali / 'librt/libc/arch/aarch64/_setjmp.S')
+    compile(a.vali / 'librt/libc/arch/aarch64/_fpreset.S')
+    kernel_jmp = out / 'kernel-setjmp.obj'
+    run('kernel-setjmp', common + ['-DLIBC_KERNEL', '-mgeneral-regs-only', '-c',
+                                  a.vali / 'librt/libc/arch/aarch64/_setjmp.S', '-o', kernel_jmp])
+    kernel_asm = run('kernel-setjmp-inspect', [a.bin / 'llvm-objdump', '-d', kernel_jmp]).lower()
+    assert not re.search(r'\b(?:[dqvs][0-9]+|fpcr|fpsr)\b', kernel_asm)
+
+    compile(a.vali / 'librt/libos/uthreads/aarch64/context.S')
+    compile(inputs / 'thread-unavailable.S')
+    compile(inputs / 'thread-exceptions.cpp', cxxflags)
 if a.builtins:
     objects.append(a.builtins.resolve())
 else:

@@ -95,7 +95,13 @@ endif()
 check_cxx_compiler_flag(-nostdinc++ CXX_SUPPORTS_NOSTDINCXX_FLAG)
 
 # Check libraries
-if(FUCHSIA)
+if(VALI)
+  # Vali's libc owns logical-thread destructor registration. Do not probe host
+  # libraries while configuring a cross-compiled PE runtime.
+  set(LIBCXXABI_HAS_DL_LIB NO)
+  set(LIBCXXABI_HAS_PTHREAD_LIB NO)
+  set(LIBCXXABI_HAS_CXA_THREAD_ATEXIT_IMPL YES)
+elseif(FUCHSIA)
   set(LIBCXXABI_HAS_DL_LIB NO)
   set(LIBCXXABI_HAS_PTHREAD_LIB NO)
   check_library_exists(c __cxa_thread_atexit_impl ""
